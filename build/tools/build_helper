@@ -24,7 +24,7 @@
 # author Laurent Thomas, Lionel GAUTHIER
 #
 #######################################
-SUPPORTED_DISTRO="Ubuntu 14.04/16.04, CentOS 7, RHEL 7"
+SUPPORTED_DISTRO="Ubuntu 14.04/16.04/17.04/17.10/18.04, CentOS 7, RHEL 7"
 if [ ! -f /etc/os-release ]; then
   echo_fatal "No /etc/os-release file found. You're likely on an unsupported distro."
 fi
@@ -97,6 +97,9 @@ get_distribution_release() {
 check_supported_distribution() {
     local distribution=$(get_distribution_release)
     case "$distribution" in
+        "ubuntu18.04") return 0 ;;
+        "ubuntu17.10") return 0 ;;
+        "ubuntu17.04") return 0 ;;
         "ubuntu16.04") return 0 ;;
         "ubuntu14.04") return 0 ;;
         "rhel7")       return 0 ;;
@@ -130,7 +133,7 @@ clean_kernel() {
 clean_all_files() {
  set_openair_env
  dir=$OPENAIRCN_DIR/build
- rm -rf $dir/log 
+ rm -rf $dir/log $OPENAIR_DIR/targets/bin/*
  rm -rf $dir/epc/build $dir/epc/CMakeLists.txt
  rm -rf $dir/mme/build $dir/mme/CMakeLists.txt
  rm -rf $dir/hss/build
@@ -209,11 +212,11 @@ function version_gt() {
 compilations() {
   echo_info "Compilation log for $3 is here: $dlog/$2.txt"
   cd $OPENAIRCN_DIR/build/$1/build
-  if [ "a$4" == "a1" ]; then 
+  if [ "a$4" == "a1" ]; then
     {
       rm -f $3
       make $make_args $2
-    } | tee $dlog/$2.txt 
+    } | tee $dlog/$2.txt
   else
     {
       rm -f $3
@@ -516,7 +519,6 @@ install_freediameter_from_source() {
       gcc \
       gdb \
       libgcrypt-dev \
-      libgnutls-dev \
       libidn11-dev \
       libmysqlclient-dev \
       libpq-dev \
@@ -527,6 +529,15 @@ install_freediameter_from_source() {
       python-dev \
       ssl-cert \
       swig"
+
+    case "$(get_distribution_release)" in
+      "ubuntu17.04" | "ubuntu17.10" | "ubuntu18.04")
+        PACKAGE_LIST="$PACKAGE_LIST libgnutls28-dev"
+      ;;
+      "ubuntu14.04" | "ubuntu16.04")
+        PACKAGE_LIST="$PACKAGE_LIST libgnutls-dev"
+      ;;
+    esac
   elif [[ "$OS_BASEDISTRO" == "fedora" ]]; then
     PACKAGE_LIST="\
       autoconf \
@@ -783,8 +794,16 @@ check_install_hss_software() {
 
   # Libraries
   if [[ $OS_DISTRO == "ubuntu" ]]; then
+    case "$(get_distribution_release)" in
+        "ubuntu14.04" | "ubuntu16.04" | "ubuntu17.04" | "ubuntu17.10")
+            specific_packages="libconfig8-dev"
+            ;;
+        "ubuntu18.04")
+            specific_packages="libconfig-dev"
+            ;;
+    esac
     PACKAGE_LIST="\
-      libconfig8-dev \
+      $specific_packages \
       libgcrypt11-dev \
       libidn2-0-dev \
       libidn11-dev \
@@ -839,8 +858,8 @@ check_install_hss_software() {
         python-pexpect \
         libapache2-mod-php*"
       ;;
-    "ubuntu16.04")
-      PACKAGE_LIST="\
+    "ubuntu16.04" | "ubuntu17.04" | "ubuntu17.10" | "ubuntu18.04")
+        PACKAGE_LIST="\
         php \
         phpmyadmin \
         python-pexpect \
@@ -891,11 +910,19 @@ check_install_mme_software() {
       doxygen \
       doxygen-gui \
       flex \
-      gccxml \
       gdb \
       git \
       pkg-config \
       subversion"
+
+    case "$(get_distribution_release)" in
+      "ubuntu17.04" | "ubuntu17.10" | "ubuntu18.04")
+        PACKAGE_LIST="$PACKAGE_LIST castxml"
+      ;;
+      "ubuntu14.04" | "ubuntu16.04")
+        PACKAGE_LIST="$PACKAGE_LIST gccxml"
+      ;;
+    esac
   elif [[ "$OS_BASEDISTRO" == "fedora" ]]; then
     PACKAGE_LIST="\
       autoconf \
@@ -918,9 +945,17 @@ check_install_mme_software() {
 
   # Libraries
   if [[ $OS_DISTRO == "ubuntu" ]]; then
-    PACKAGE_LIST="\
+    case "$(get_distribution_release)" in
+        "ubuntu14.04" | "ubuntu16.04" | "ubuntu17.04" | "ubuntu17.10")
+            specific_packages="libconfig8-dev"
+            ;;
+        "ubuntu18.04")
+            specific_packages="libconfig-dev"
+            ;;
+    esac
+    PACKAGE_LIST="
+      $specific_packages \
       guile-2.0-dev \
-      libconfig8-dev \
       libgcrypt11-dev \
       libgmp-dev \
       libhogweed? \
@@ -966,14 +1001,21 @@ check_install_mme_software() {
   $SUDO $INSTALLER install $OPTION $PACKAGE_LIST
   if [ $? -ne 0 ]; then
     echo_fatal "Failed to install package list $PACKAGE_LIST"
-  fi 
+  fi
 
   if [[ $OS_DISTRO == 'ubuntu' ]]; then
     #Remove old gnutls/nettle installation that was done from sources
     remove_nettle_from_source
     remove_gnutls_from_source
     $SUDO apt-get install -y nettle-dev nettle-bin
-    $SUDO apt-get install -y libgnutls-dev
+    case "$(get_distribution_release)" in
+      "ubuntu17.04" | "ubuntu17.10" | "ubuntu18.04")
+        $SUDO apt-get install -y libgnutls28-dev
+      ;;
+      "ubuntu14.04" | "ubuntu16.04")
+        $SUDO apt-get install -y libgnutls-dev
+      ;;
+    esac
   fi
   
   install_freediameter_from_source $1
@@ -984,9 +1026,17 @@ check_install_mme_software() {
 
   # Networking
   if [[ $OS_DISTRO == "ubuntu" ]]; then
-    PACKAGE_LIST="\
+    case "$(get_distribution_release)" in
+        "ubuntu14.04" | "ubuntu16.04" | "ubuntu17.04" | "ubuntu17.10")
+            specific_packages="iproute"
+            ;;
+        "ubuntu18.04")
+            specific_packages="iproute2"
+            ;;
+    esac
+    PACKAGE_LIST="
+      $specific_packages \
       ethtool \
-      iproute \
       vlan \
       tshark"
   elif [[ "$OS_BASEDISTRO" == "fedora" ]]; then
@@ -1086,11 +1136,19 @@ check_install_spgw_software() {
       doxygen \
       doxygen-gui \
       flex \
-      gccxml \
       gdb \
       git \
       pkg-config \
       subversion"
+
+    case "$(get_distribution_release)" in
+      "ubuntu17.04" | "ubuntu17.10" | "ubuntu18.04")
+        PACKAGE_LIST="$PACKAGE_LIST castxml"
+      ;;
+      "ubuntu14.04" | "ubuntu16.04")
+        PACKAGE_LIST="$PACKAGE_LIST gccxml"
+      ;;
+    esac
   elif [[ "$OS_BASEDISTRO" == "fedora" ]]; then
     PACKAGE_LIST="\
       autoconf \
@@ -1118,9 +1176,17 @@ check_install_spgw_software() {
 
   # Libraries
   if [[ $OS_DISTRO == "ubuntu" ]]; then
-    PACKAGE_LIST="\
+    case "$(get_distribution_release)" in
+        "ubuntu14.04" | "ubuntu16.04" | "ubuntu17.04" | "ubuntu17.10")
+            specific_packages="libconfig8-dev"
+            ;;
+        "ubuntu18.04")
+            specific_packages="libconfig-dev"
+            ;;
+    esac
+    PACKAGE_LIST="
+      $specific_packages \
       guile-2.0-dev \
-      libconfig8-dev \
       libgcrypt11-dev \
       libgmp-dev \
       libhogweed? \
@@ -1163,10 +1229,18 @@ check_install_spgw_software() {
 
   # Networking
   if [[ $OS_DISTRO == "ubuntu" ]]; then
-    PACKAGE_LIST="\
+    case "$(get_distribution_release)" in
+        "ubuntu14.04" | "ubuntu16.04" | "ubuntu17.04" | "ubuntu17.10")
+            specific_packages="iproute"
+            ;;
+        "ubuntu18.04")
+            specific_packages="iproute2"
+            ;;
+    esac
+    PACKAGE_LIST="
+      $specific_packages \
       ethtool \
       iperf \
-      iproute \
       vlan \
       tshark"
   elif [[ "$OS_BASEDISTRO" == "fedora" ]]; then
