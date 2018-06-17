@@ -64,6 +64,7 @@
     MOBILE_STATION_CLASSMARK_2_MAXIMUM_LENGTH + \
     MOBILE_STATION_CLASSMARK_3_MAXIMUM_LENGTH + \
     SUPPORTED_CODEC_LIST_MAXIMUM_LENGTH + \
+    VOICE_DOMAIN_PREFERENCE_AND_UE_USAGE_SETTING_MAXIMUM_LENGTH + \
     ADDITIONAL_UPDATE_TYPE_MAXIMUM_LENGTH )
 
 /* If an optional value is present and should be encoded, the corresponding
@@ -86,7 +87,8 @@
 # define TRACKING_AREA_UPDATE_REQUEST_MOBILE_STATION_CLASSMARK_3_PRESENT                    (1<<14)
 # define TRACKING_AREA_UPDATE_REQUEST_SUPPORTED_CODECS_PRESENT                              (1<<15)
 # define TRACKING_AREA_UPDATE_REQUEST_ADDITIONAL_UPDATE_TYPE_PRESENT                        (1<<16)
-# define TRACKING_AREA_UPDATE_REQUEST_OLD_GUTI_TYPE_PRESENT                                 (1<<17)
+# define TRACKING_AREA_UPDATE_REQUEST_VOICE_DOMAIN_PREFERENCE_AND_UE_USAGE_SETTING_PRESENT  (1<<17)
+# define TRACKING_AREA_UPDATE_REQUEST_OLD_GUTI_TYPE_PRESENT                                 (1<<18)
 
 typedef enum tracking_area_update_request_iei_tag {
   TRACKING_AREA_UPDATE_REQUEST_NONCURRENT_NATIVE_NAS_KEY_SET_IDENTIFIER_IEI       = 0xB0, /* 0xB0 = 176 */
@@ -106,6 +108,7 @@ typedef enum tracking_area_update_request_iei_tag {
   TRACKING_AREA_UPDATE_REQUEST_MOBILE_STATION_CLASSMARK_3_IEI                     = C_MOBILE_STATION_CLASSMARK_3_IEI,
   TRACKING_AREA_UPDATE_REQUEST_SUPPORTED_CODECS_IEI                               = 0x40, /* 0x40 = 64 */
   TRACKING_AREA_UPDATE_REQUEST_ADDITIONAL_UPDATE_TYPE_IEI                         = 0xF0, /* 0xF0 = 240 */
+  TRACKING_AREA_UPDATE_REQUEST_VOICE_DOMAIN_PREFERENCE_AND_UE_USAGE_SETTING_IEI   = 0x5D, /* 0x5D = 93  */
   TRACKING_AREA_UPDATE_REQUEST_OLD_GUTI_TYPE_IEI                                  = 0xE0, /* 0xE0 = 224 */
 } tracking_area_update_request_iei;
 
@@ -143,6 +146,7 @@ typedef struct tracking_area_update_request_msg_tag {
   mobile_station_classmark3_t              mobilestationclassmark3;
   supported_codec_list_t                   supportedcodecs;
   additional_update_type_t                 additionalupdatetype;
+  voice_domain_preference_and_ue_usage_setting_t   voicedomainpreferenceandueusagesetting;
   guti_type_t                              oldgutitype;
 } tracking_area_update_request_msg;
 
