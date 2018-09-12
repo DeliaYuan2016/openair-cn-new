@@ -61,6 +61,8 @@ typedef enum esm_primitive_s {
   ESM_DEDICATED_EPS_BEARER_CONTEXT_ACTIVATE_REQ,
   ESM_DEDICATED_EPS_BEARER_CONTEXT_ACTIVATE_CNF,
   ESM_DEDICATED_EPS_BEARER_CONTEXT_ACTIVATE_REJ,
+  ESM_DEDICATED_EPS_BEARER_CONTEXT_DEACTIVATE_REQ,
+  ESM_DEDICATED_EPS_BEARER_CONTEXT_DEACTIVATE_CNF,
   ESM_EPS_BEARER_CONTEXT_MODIFY_REQ,
   ESM_EPS_BEARER_CONTEXT_MODIFY_CNF,
   ESM_EPS_BEARER_CONTEXT_MODIFY_REJ,
@@ -70,6 +72,7 @@ typedef enum esm_primitive_s {
   ESM_PDN_CONNECTIVITY_CNF,
   ESM_PDN_CONNECTIVITY_REJ,
   ESM_PDN_DISCONNECT_REQ,
+  ESM_PDN_DISCONNECT_CNF,
   ESM_PDN_DISCONNECT_REJ,
   ESM_BEARER_RESOURCE_ALLOCATE_REQ,
   ESM_BEARER_RESOURCE_ALLOCATE_REJ,
@@ -84,7 +87,8 @@ typedef enum esm_primitive_s {
 /************************  G L O B A L    T Y P E S  ************************/
 /****************************************************************************/
 
-typedef struct itti_mme_app_create_dedicated_bearer_req_s esm_eps_create_dedicated_bearer_req_t;
+typedef struct itti_mme_app_activate_bearer_req_s   esm_eps_activate_bearer_req_t;
+typedef struct itti_mme_app_deactivate_bearer_req_s esm_eps_deactivate_bearer_req_t;
 
 /*
  * Error code returned upon processing ESM-SAP primitive
@@ -104,6 +108,10 @@ typedef enum {
  */
 typedef struct esm_activate_eps_default_bearer_context_s {
 } esm_activate_eps_default_bearer_context_t;
+
+typedef struct esm_bearer_resource_allocate_rej_s{
+  ebi_t             ebi;
+}esm_bearer_resource_allocate_rej_t;
 
 /*
  * ESM primitive for PDN config response
@@ -138,18 +146,9 @@ typedef struct esm_pdn_connectivity_s {
  */
 typedef struct esm_pdn_disconnect_s {
   ebi_t     default_ebi;        /* Default EBI of PDN context */
-  pdn_cid_t cid;        /* PDN connection local identifier      */
+  pdn_cid_t cid;                /* PDN connection local identifier      */
+  bool      local_delete;       /* PDN connection local identifier      */
 } esm_pdn_disconnect_t;
-
-/*
- * ESM primitive for deactivate EPS bearer context procedure
- * ---------------------------------------------------------
- */
-typedef struct esm_eps_bearer_context_deactivate_s {
-#define ESM_SAP_ALL_EBI     0xff
-  ebi_t ebi;   /* EPS bearer identity of the EPS bearer context
-             * to be deactivated                */
-} esm_eps_bearer_context_deactivate_t;
 
 ///*
 // * ESM bearer context creation
@@ -185,8 +184,9 @@ typedef union {
   esm_pdn_config_res_t pdn_config_res;
   esm_pdn_connectivity_t pdn_connect;
   esm_pdn_disconnect_t pdn_disconnect;
-  esm_eps_bearer_context_deactivate_t eps_bearer_context_deactivate;
-  esm_eps_create_dedicated_bearer_req_t eps_dedicated_bearer_context_activate;
+  esm_eps_activate_bearer_req_t     eps_dedicated_bearer_context_activate;
+  esm_eps_deactivate_bearer_req_t   eps_dedicated_bearer_context_deactivate;
+  esm_bearer_resource_allocate_rej_t    esm_bearer_resource_allocate_rej;
 } esm_sap_data_t;
 
 struct emm_data_context_s;

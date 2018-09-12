@@ -51,7 +51,6 @@
 #include "s10_messages_types.h"
 #include "s11_messages_types.h"
 #include "security_types.h"
-#include "sgw_ie_defs.h"
 #include "emm_data.h"
 #include "esm_data.h"
 
@@ -116,8 +115,8 @@ struct mme_app_timer_t {
 };
 
 typedef struct fteid_set_s {
-  fteid_t s1u_fteid;
-  fteid_t s5_fteid;
+  fteid_t *s1u_fteid;
+  fteid_t *s5_fteid;
 };
 
 /** @struct bearer_context_t
@@ -126,6 +125,7 @@ typedef struct fteid_set_s {
 typedef struct bearer_context_s {
   // EPS Bearer ID: An EPS bearer identity uniquely identifies an EP S bearer for one UE accessing via E-UTRAN
   ebi_t                       ebi;
+  ebi_t                       linked_ebi;
 
   // TI Transaction Identifier
   proc_tid_t                  transaction_identifier;
@@ -331,6 +331,8 @@ typedef struct ue_context_s {
   /* Time when the cell identity was acquired */
   time_t                 cell_age;                    // Time elapsed since the last E-UTRAN Cell Global Identity was acquired. set by nas_auth_param_req_t
 
+  teid_t                 s_gw_teid_s11_s4;
+
   /* TODO: add csg_id */
   /* TODO: add csg_membership */
   /* TODO Access mode: Access mode of last known ECGI when the UE was active */
@@ -503,6 +505,8 @@ typedef struct ue_context_s {
   struct mme_app_timer_t       path_switch_req_timer;
   // todo: (2) timers necessary for handover?
   struct mme_app_timer_t       s1ap_handover_req_timer;
+
+  ebi_t                        next_def_ebi_offset;
 } ue_context_t;
 
 
@@ -633,6 +637,7 @@ void mme_app_ue_context_free_content (ue_context_t * const mme_ue_context_p);
  **/
 void mme_app_dump_ue_contexts(const mme_ue_context_t * const mme_ue_context);
 
+int mme_app_registration_complete(const mme_ue_s1ap_id_t mme_ue_s1ap_id);
 
 void mme_app_handle_s1ap_ue_context_release_req(const itti_s1ap_ue_context_release_req_t const *s1ap_ue_context_release_req);
 

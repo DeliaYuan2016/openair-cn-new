@@ -87,6 +87,8 @@ void mme_app_handle_s1ap_ue_context_release_complete (const itti_s1ap_ue_context
 
 void mme_app_itti_ue_context_release (    mme_ue_s1ap_id_t mme_ue_s1ap_id, enb_ue_s1ap_id_t enb_ue_s1ap_id, enum s1cause cause, uint32_t target_enb_id);
 
+void mme_app_itti_notify_request(const imsi64_t imsi, const plmn_t * handovered_plmn, const bool mobility_completion);
+
 int mme_app_send_s6a_update_location_req     (struct ue_context_s * const ue_context);
 
 int mme_app_handle_s6a_update_location_ans   (const s6a_update_location_ans_t * const ula_pP);
@@ -103,7 +105,9 @@ void mme_app_handle_initial_ue_message       (itti_s1ap_initial_ue_message_t * c
 
 int mme_app_handle_create_sess_resp          (itti_s11_create_session_response_t * const create_sess_resp_pP); //not const because we need to free internal stucts
 
-void mme_app_handle_erab_setup_req (itti_erab_setup_req_t * const itti_erab_setup_req);
+void mme_app_handle_nas_erab_setup_req (itti_nas_erab_setup_req_t * const itti_nas_erab_setup_req);
+
+void mme_app_handle_nas_erab_release_req (itti_nas_erab_release_req_t * const itti_nas_erab_release_req);
 
 void mme_app_handle_delete_session_rsp	     (const itti_s11_delete_session_response_t * const delete_sess_respP);
 
@@ -113,7 +117,9 @@ int mme_app_handle_authentication_info_answer(const s6a_auth_info_ans_t * const 
 
 void  mme_app_handle_release_access_bearers_resp (const itti_s11_release_access_bearers_response_t * const rel_access_bearers_rsp_pP);
 
-void mme_app_handle_s11_create_bearer_req        (const itti_s11_create_bearer_request_t * const create_bearer_request_pP);
+void mme_app_handle_s11_create_bearer_req        (itti_s11_create_bearer_request_t * create_bearer_request_pP);
+
+void mme_app_handle_s11_delete_bearer_req (    itti_s11_delete_bearer_request_t *  delete_bearer_request_pP);
 
 void mme_app_bearer_create_workflow (ue_context_t * const ue_context, const pdn_cid_t cid);
 
@@ -129,22 +135,17 @@ int mme_app_handle_nas_dl_req ( itti_nas_dl_data_req_t *const nas_dl_req_pP);
 
 void mme_app_handle_e_rab_setup_rsp (itti_s1ap_e_rab_setup_rsp_t  * const e_rab_setup_rsp);
 
-void mme_app_handle_create_dedicated_bearer_rsp (itti_mme_app_create_dedicated_bearer_rsp_t   * const create_dedicated_bearer_rsp);
+void mme_app_handle_activate_bearer_cnf (itti_mme_app_activate_bearer_cnf_t   * const activate_bearer_cnf);
 
-void mme_app_handle_create_dedicated_bearer_rej (itti_mme_app_create_dedicated_bearer_rej_t   * const create_dedicated_bearer_rej);
+void mme_app_handle_activate_bearer_rej (itti_mme_app_activate_bearer_rej_t   * const activate_bearer_rej);
+
+void mme_app_handle_deactivate_bearer_cnf (itti_mme_app_deactivate_bearer_cnf_t   * const deactivate_bearer_cnf);
 
 void mme_app_trigger_mme_initiated_dedicated_bearer_deactivation_procedure (ue_context_t * const ue_context, const pdn_cid_t cid);
 
 
-
-
-
-
-
-
-
 /** S1AP Handover messaging. */
-void mme_app_handle_handover_required( itti_s1ap_handover_required_t * handover_required_pP );
+void mme_app_handle_s1ap_handover_required( itti_s1ap_handover_required_t * handover_required_pP );
 
 void mme_app_handle_handover_cancel( const itti_s1ap_handover_cancel_t * const handover_cancel_pP );
 
@@ -160,6 +161,8 @@ void mme_app_handle_forward_access_context_acknowledge( const itti_s10_forward_a
 void mme_app_handle_handover_request_acknowledge(itti_s1ap_handover_request_acknowledge_t * const handover_request_acknowledge_pP    );
 
 void mme_app_handle_handover_failure(const itti_s1ap_handover_failure_t * const handover_failure_pP    );
+
+void mme_app_s1ap_error_indication(const itti_s1ap_error_indication_t * const s1ap_error_indication_pP    );
 
 void mme_app_handle_enb_status_transfer(itti_s1ap_status_transfer_t* const s1ap_status_transfer_pP    );
 

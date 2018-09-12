@@ -24,6 +24,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
+#include <stdio.h>
 
 
 #include "bstrlib.h"
@@ -34,6 +36,8 @@
 #include "msc.h"
 #include "tree.h"
 #include "common_types.h"
+#include "gcc_diag.h"
+
 #include "3gpp_24.007.h"
 #include "3gpp_24.301.h"
 #include "3gpp_24.008.h"
@@ -41,7 +45,6 @@
 #include "common_types.h"
 #include "commonDef.h"
 #include "common_defs.h"
-#include "mme_app_ue_context.h"
 #include "NasSecurityAlgorithms.h"
 #include "conversions.h"
 #include "emm_data.h"
@@ -587,13 +590,12 @@ inline void emm_ctx_update_from_mm_eps_context(emm_data_context_t * const emm_ct
   if (IS_EMM_CTXT_PRESENT_UE_NETWORK_CAPABILITY(emm_ctx_p)) {
     OAILOG_DEBUG (LOG_NAS_EMM, "EMM-PROC  - UE network capabilities already present for IMSI " IMSI_64_FMT ". Not setting from S10 Context Response. \n", emm_ctx_p->_imsi64);
   }else{
-    emm_ctx_set_ue_nw_cap(emm_ctx_p, &mm_eps_ctxt->ue_nc);
+    emm_ctx_set_valid_ue_nw_cap(emm_ctx_p, &mm_eps_ctxt->ue_nc);
   }
   if (IS_EMM_CTXT_PRESENT_MS_NETWORK_CAPABILITY(emm_ctx_p)) {
     OAILOG_DEBUG (LOG_NAS_EMM, "EMM-PROC  - MS network capabilities already present for IMSI " IMSI_64_FMT ". Not setting from S10 Context Response. \n", emm_ctx_p->_imsi64);
   }else{
-    emm_ctx_set_attribute_present(emm_ctx_p, EMM_CTXT_MEMBER_MS_NETWORK_CAPABILITY_IE);
-    memcpy((void*)&emm_ctx_p->_ms_network_capability, (ms_network_capability_t*)&mm_eps_ctxt->ms_nc, sizeof(ms_network_capability_t)); // todo: review this
+    emm_ctx_set_valid_ms_nw_cap(emm_ctx_p, (ms_network_capability_t*)&mm_eps_ctxt->ms_nc);
     // todo: review all of this
 //    emm_ctx_p->gea = (mm_eps_ctxt->ms_nc.gea1 << 6)| mm_eps_ctxt->ms_nc.egea;
 //    emm_ctx_p->gprs_present = true; /**< Todo: how to find this out? */
@@ -834,6 +836,7 @@ void emm_init_context(struct emm_data_context_s * const emm_ctx, const bool init
   emm_ctx->_emm_fsm_state  = EMM_DEREGISTERED;
 
   OAILOG_DEBUG (LOG_NAS_EMM, "UE " MME_UE_S1AP_ID_FMT " Init EMM-CTX\n", emm_ctx->ue_id);
+  emm_ctx->_security.ncc = 0;
 
   bdestroy_wrapper(&emm_ctx->esm_msg);
   emm_ctx_clear_guti(emm_ctx);
@@ -866,14 +869,15 @@ int emm_data_context_update_security_parameters(const mme_ue_s1ap_id_t ue_id,
   OAILOG_FUNC_IN (LOG_NAS_EMM);
 
   emm_data_context_t                     *emm_ctx = emm_data_context_get (&_emm_data, ue_id);
+  ue_context_t                           *ue_context = mme_ue_context_exists_mme_ue_s1ap_id (&mme_app_desc.mme_ue_contexts, ue_id);
 
   if (!emm_ctx) {
-    OAILOG_ERROR(LOG_NAS_EMM, "EMM-CTX - no EMM context existing for UE id " MME_UE_S1AP_ID_FMT ". Cannot update the AS security. \n", ue_id);
+    OAILOG_ERROR(LOG_NAS_EMM, "EMM-CTX - no EMM context existing for UE id " MME_UE_S1AP_ID_FMT ". Cannot update the AS security. \n", ue_context->mme_ue_s1ap_id);
     OAILOG_FUNC_RETURN (LOG_NAS_EMM, RETURNerror);
   }
   if (!IS_EMM_CTXT_VALID_SECURITY(emm_ctx)) {
     OAILOG_ERROR(LOG_NAS_EMM, "EMM-CTX - no valid security context exist EMM context for UE id " MME_UE_S1AP_ID_FMT " and IMSI " IMSI_64_FMT ". Cannot update the AS security. \n",
-        ue_id, emm_ctx->_imsi64);
+        ue_context->mme_ue_s1ap_id, emm_ctx->_imsi64);
     OAILOG_FUNC_RETURN (LOG_NAS_EMM, RETURNerror);
   }
 
@@ -890,9 +894,91 @@ int emm_data_context_update_security_parameters(const mme_ue_s1ap_id_t ue_id,
   emm_ctx->_security.ncc++;
   /* The NCC is a 3-bit key index (values from 0 to 7) for the NH and is sent to the UE in the handover command signaling. */
   emm_ctx->_security.ncc = emm_ctx->_security.ncc % 8;
+  /** If a wrap up occurs, skip the first one. */
+  if(!emm_ctx->_security.ncc){
+    /** Set the pending deactivation flag of the ncc. Will start from 0 then. */
+    ue_context->pending_bearer_deactivation = true;
+    OAILOG_ERROR(LOG_NAS_EMM, "EMM-CTX - NCC reached 7. Activating the pending bearer deactivation for UE context with ueId " MME_UE_S1AP_ID_FMT ". \n", ue_context->mme_ue_s1ap_id);
+  }
+//  if(!emm_ctx->_security.ncc){
+//
+//    OAILOG_INFO(LOG_NAS_EMM, "EMM-CTX - NCC wrap around for UE id " MME_UE_S1AP_ID_FMT " and IMSI " IMSI_64_FMT ". UL Count is %d. Sec_vector %d. \n",
+//        emm_ctx->ue_id, emm_ctx->_imsi64, emm_ctx->_security.ul_count.seq_num, emm_ctx->_security.vector_index);
+//
+//    memset(emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj, 0, 32);
+//    OAILOG_STREAM_HEX(OAILOG_LEVEL_DEBUG, LOG_NAS, "Resetted NH_CONJ: ", emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj, 32);
+//
+//    /** NCC wrap around, recalculate KeNB. */
+//    derive_keNB (emm_ctx->_vector[emm_ctx->_security.vector_index].kasme,
+//        emm_ctx->_security.ul_count.seq_num, emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj);
+//    OAILOG_STREAM_HEX(OAILOG_LEVEL_DEBUG, LOG_NAS, "New KeNB/NH_CONJ: ", emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj, 32);
+//
+//    /** Increase the NCC. */
+//    emm_ctx->_security.ncc++;
+//    /** Derive the next hop. */
+//    derive_nh(emm_ctx->_vector[emm_ctx->_security.vector_index].kasme, emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj);
+//    OAILOG_STREAM_HEX(OAILOG_LEVEL_DEBUG, LOG_NAS_EMM, "New NH_CONJ for ncc1: ", emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj, 32);
+//  }
 
   OAILOG_INFO(LOG_NAS_EMM, "EMM-CTX - Updated AS security parameters for EMM context with UE id " MME_UE_S1AP_ID_FMT " and IMSI " IMSI_64_FMT ". \n",
-          ue_id, emm_ctx->_imsi64);
+      ue_context->mme_ue_s1ap_id, emm_ctx->_imsi64);
+  OAILOG_FUNC_RETURN (LOG_NAS_EMM, RETURNok);
+}
+
+//------------------------------------------------------------------------------
+int mm_ue_eps_context_update_security_parameters(mme_ue_s1ap_id_t ue_id,
+    mm_context_eps_t *mm_eps_ue_context,
+    uint16_t *encryption_algorithm_capabilities,
+    uint16_t *integrity_algorithm_capabilities)
+{
+  uint8_t                 kenb[32];
+  uint32_t                ul_nas_count;
+
+  OAILOG_FUNC_IN (LOG_NAS_EMM);
+
+  ue_context_t                           *ue_context = mme_ue_context_exists_mme_ue_s1ap_id (&mme_app_desc.mme_ue_contexts, ue_id);
+
+  if (!mm_eps_ue_context) {
+    OAILOG_ERROR(LOG_NAS_EMM, "EMM-CTX - no MM EPS UE context existing. Cannot update the AS security for UE context with ueId " MME_UE_S1AP_ID_FMT ". \n", ue_context->mme_ue_s1ap_id);
+    OAILOG_FUNC_RETURN (LOG_NAS_EMM, RETURNerror);
+  }
+
+  *encryption_algorithm_capabilities = ((uint16_t)mm_eps_ue_context->ue_nc.eea & ~(1 << 7)) << 1;
+  *integrity_algorithm_capabilities = ((uint16_t)mm_eps_ue_context->ue_nc.eia & ~(1 << 7)) << 1;
+
+  /** Derive the next hop. */
+  derive_nh(mm_eps_ue_context->k_asme, mm_eps_ue_context->nh);
+
+  /** Increase the next hop counter. */
+  mm_eps_ue_context->ncc++;
+  /* The NCC is a 3-bit key index (values from 0 to 7) for the NH and is sent to the UE in the handover command signaling. */
+  mm_eps_ue_context->ncc = mm_eps_ue_context->ncc % 8;
+  /** If a wrap up occurs, skip the first one. */
+  if(!mm_eps_ue_context->ncc){
+    /** Set the pending deactivation flag of the ncc. Will start from 0 then. */
+    ue_context->pending_bearer_deactivation = true;
+    OAILOG_ERROR(LOG_NAS_EMM, "EMM-CTX - NCC reached 7. Activating the pending bearer deactivation for UE context with ueId " MME_UE_S1AP_ID_FMT ". \n", ue_context->mme_ue_s1ap_id);
+  }
+//  if(!emm_ctx->_security.ncc){
+//
+//    OAILOG_INFO(LOG_NAS_EMM, "EMM-CTX - NCC wrap around for UE id " MME_UE_S1AP_ID_FMT " and IMSI " IMSI_64_FMT ". UL Count is %d. Sec_vector %d. \n",
+//        emm_ctx->ue_id, emm_ctx->_imsi64, emm_ctx->_security.ul_count.seq_num, emm_ctx->_security.vector_index);
+//
+//    memset(emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj, 0, 32);
+//    OAILOG_STREAM_HEX(OAILOG_LEVEL_DEBUG, LOG_NAS, "Resetted NH_CONJ: ", emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj, 32);
+//
+//    /** NCC wrap around, recalculate KeNB. */
+//    derive_keNB (emm_ctx->_vector[emm_ctx->_security.vector_index].kasme,
+//        emm_ctx->_security.ul_count.seq_num, emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj);
+//    OAILOG_STREAM_HEX(OAILOG_LEVEL_DEBUG, LOG_NAS, "New KeNB/NH_CONJ: ", emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj, 32);
+//
+//    /** Increase the NCC. */
+//    emm_ctx->_security.ncc++;
+//    /** Derive the next hop. */
+//    derive_nh(emm_ctx->_vector[emm_ctx->_security.vector_index].kasme, emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj);
+//    OAILOG_STREAM_HEX(OAILOG_LEVEL_DEBUG, LOG_NAS_EMM, "New NH_CONJ for ncc1: ", emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj, 32);
+//  }
+  OAILOG_INFO(LOG_NAS_EMM, "EMM-CTX - Updated MM EPS UE context security context parameters for UE context with ueId " MME_UE_S1AP_ID_FMT ". \n", ue_context->mme_ue_s1ap_id);
   OAILOG_FUNC_RETURN (LOG_NAS_EMM, RETURNok);
 }
 

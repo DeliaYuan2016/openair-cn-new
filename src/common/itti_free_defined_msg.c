@@ -107,17 +107,10 @@ void itti_free_msg_content (MessageDef * const message_p)
   }
   break;
 
-  case MME_APP_CREATE_DEDICATED_BEARER_REQ: {
-    for (int i = 0; i < BEARERS_PER_UE; i++) {
-      if (message_p->ittiMsg.mme_app_create_dedicated_bearer_req.tfts[i]) {
-        free_traffic_flow_template(&message_p->ittiMsg.mme_app_create_dedicated_bearer_req.tfts[i]);
-      }
-      if(message_p->ittiMsg.mme_app_create_dedicated_bearer_req.fteid_set[i]) {
-        free_wrapper((void**)&message_p->ittiMsg.mme_app_create_dedicated_bearer_req.fteid_set[i]);
-      }
-      if(message_p->ittiMsg.mme_app_create_dedicated_bearer_req.pcos[i]) {
-        clear_protocol_configuration_options(&message_p->ittiMsg.mme_app_create_dedicated_bearer_req.pcos[i]);
-      }
+  case MME_APP_ACTIVATE_BEARER_REQ: {
+    /** Bearer Context to Be Setup. */
+    if(message_p->ittiMsg.mme_app_activate_bearer_req.bcs_to_be_created){
+      free_bearer_contexts_to_be_created(&message_p->ittiMsg.mme_app_activate_bearer_req.bcs_to_be_created);
     }
   }
   break;
@@ -186,7 +179,11 @@ void itti_free_msg_content (MessageDef * const message_p)
     break;
 
   case NAS_ERAB_SETUP_REQ:
-    bdestroy_wrapper (&message_p->ittiMsg.itti_erab_setup_req.nas_msg);
+    bdestroy_wrapper (&message_p->ittiMsg.nas_erab_setup_req.nas_msg);
+    break;
+
+  case NAS_ERAB_RELEASE_REQ:
+    bdestroy_wrapper (&message_p->ittiMsg.nas_erab_release_req.nas_msg);
     break;
 
   case NAS_PDN_CONFIG_REQ:
@@ -212,6 +209,14 @@ void itti_free_msg_content (MessageDef * const message_p)
 
   case S11_CREATE_BEARER_REQUEST: {
     clear_protocol_configuration_options(&message_p->ittiMsg.s11_create_bearer_request.pco);
+    if(message_p->ittiMsg.s11_create_bearer_request.bearer_contexts){
+      free_bearer_contexts_to_be_created(&message_p->ittiMsg.s11_create_bearer_request.bearer_contexts);
+    }
+  }
+  break;
+
+  case S11_DELETE_BEARER_REQUEST: {
+    clear_protocol_configuration_options(&message_p->ittiMsg.s11_delete_bearer_request.pco);
   }
   break;
 
@@ -249,6 +254,7 @@ void itti_free_msg_content (MessageDef * const message_p)
   case S1AP_UE_CONTEXT_RELEASE_COMMAND_LOG:
   case S1AP_UE_CONTEXT_RELEASE_LOG:
   case S1AP_E_RABSETUP_RESPONSE_LOG:
+  case S1AP_E_RABRELEASE_RESPONSE_LOG:
 
     // DO nothing
     break;
@@ -272,6 +278,14 @@ void itti_free_msg_content (MessageDef * const message_p)
     }
   break;
 
+  case S1AP_E_RAB_RELEASE_REQ: {
+    bdestroy_wrapper (&message_p->ittiMsg.s1ap_e_rab_release_req.nas_pdu);
+    }
+    break;
+
+  case S1AP_E_RAB_RELEASE_RSP:
+  break;
+
   case S1AP_ENB_INITIATED_RESET_REQ:
     free_wrapper ((void**) &message_p->ittiMsg.s1ap_enb_initiated_reset_req.ue_to_reset_list);
     break;
@@ -279,8 +293,9 @@ void itti_free_msg_content (MessageDef * const message_p)
   case S1AP_ENB_INITIATED_RESET_ACK:
     free_wrapper ((void**) &message_p->ittiMsg.s1ap_enb_initiated_reset_ack.ue_to_reset_list);
     break;
+  case S1AP_UE_CAPABILITIES_IND:
+    break;
 
-  case S1AP_UE_CAPABILITIES_IND: // todo: removing capabilities?
   case S1AP_ENB_DEREGISTERED_IND:
   case S1AP_DEREGISTER_UE_REQ:
   case S1AP_UE_CONTEXT_RELEASE_REQ:
@@ -366,6 +381,11 @@ void itti_free_msg_content (MessageDef * const message_p)
 
   case S1AP_HANDOVER_COMMAND:
     bdestroy_wrapper(&message_p->ittiMsg.s1ap_handover_command.eutran_target_to_source_container);
+    /** Bearer Context to Be Setup. */
+    if(message_p->ittiMsg.s1ap_handover_command.bearer_ctx_to_be_forwarded_list){
+      free_bearer_contexts_to_be_created(&message_p->ittiMsg.s1ap_handover_command.bearer_ctx_to_be_forwarded_list);
+    }
+
     break;
 
   case S1AP_ENB_STATUS_TRANSFER:

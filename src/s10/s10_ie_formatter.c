@@ -49,6 +49,7 @@
 #include "security_types.h"
 #include "common_types.h"
 #include "mme_ie_defs.h"
+#include "mme_config.h"
 #include "PdnType.h"
 #include "s10_ie_formatter.h"
 
@@ -60,9 +61,7 @@ s10_guti_ie_set (
   nw_gtpv2c_msg_handle_t * msg,
   const guti_t * guti)
 {
-  uint8_t                                 guti_length,
-                                          i;
-  nw_rc_t                                   rc;
+  nw_rc_t                                 rc;
 
   DevAssert (msg );
   DevAssert (guti );
@@ -290,77 +289,13 @@ s10_f_cause_ie_set (
   return RETURNok;
 }
 
-int
-s10_target_identification_ie_set (
-  nw_gtpv2c_msg_handle_t * msg,
-  const target_identification_t * target_identification)
-{
-  nw_rc_t                                  rc;
-  uint8_t                                target_id[3];
-  uint16_t                               macro_enb_id;
-  uint16_t                               tac;
-
-  DevAssert (msg );
-  DevAssert (target_identification );
-  /*
-   * MCC Decimal | MCC Hundreds
-   */
-  target_id[0] = ((target_identification->mcc[1] & 0x0F) << 4) | (target_identification->mcc[0] & 0x0F);
-  target_id[1] = target_identification->mcc[2] & 0x0F;
-
-  if ((target_identification->mnc[0] & 0xF) == 0xF) {
-    /*
-     * Only two digits
-     */
-    target_id[1] |= 0xF0;
-    target_id[2] = ((target_identification->mnc[2] & 0x0F) << 4) | (target_identification->mnc[1] & 0x0F);
-  } else {
-    target_id[1] |= (target_identification->mnc[2] & 0x0F) << 4;
-    target_id[2] = ((target_identification->mnc[1] & 0x0F) << 4) | (target_identification->mnc[0] & 0x0F);
-  }
-
-  /** Set The Macro eNodeB Id. */
-  macro_enb_id = target_identification->target_id.macro_enb_id.enb_id;
-  tac          = target_identification->target_id.macro_enb_id.tac;
-
-  /** Build an array for the TargetIe payload. */
-
-  uint8_t targetIeBuf[9];
-  uint8_t *pTargetIeBuf= targetIeBuf;
-
-  memset(pTargetIeBuf, 0, 9);
-  /** Target Type. */
-  *pTargetIeBuf = target_identification->target_type;
-  pTargetIeBuf++;
-  /** Set the plmn. */
-  memcpy(pTargetIeBuf, target_id, 3);
-  pTargetIeBuf+=3;
-  /** Macro Enb Id. */
-  // Skip 1 place --> todo: copy 20 bits
-  pTargetIeBuf++;
-  *((uint16_t *) (pTargetIeBuf)) = htons(macro_enb_id);
-  pTargetIeBuf+=2;
-  /** TAC. */
-  *((uint16_t *) (pTargetIeBuf)) = htons(target_identification->target_id.macro_enb_id.tac);
-  // todo: extended f-cause?!
-  /** Reset the pointer. */
-  pTargetIeBuf= targetIeBuf;
-
-  rc = nwGtpv2cMsgAddIe(*msg, NW_GTPV2C_IE_TARGET_IDENTIFICATION, 9, NW_GTPV2C_IE_INSTANCE_ZERO, pTargetIeBuf);
-  DevAssert (NW_OK == rc);
-  return RETURNok;
-}
-
 nw_rc_t
 s10_pdn_connection_ie_set ( nw_gtpv2c_msg_handle_t * msg, void * arg){
   nw_rc_t                                 rc;
-  uint8_t                                 i;
-  mme_ue_eps_pdn_connections_t           *pdn_connections = (mme_ue_eps_pdn_connections_t*)arg;
+  pdn_connection_t                       *pdn_connection = (pdn_connection_t*)arg;
 
   DevAssert (msg );
-  DevAssert (pdn_connections );
-  DevAssert (0 <= pdn_connections->num_pdn_connections);
-  DevAssert(MSG_FORWARD_RELOCATION_REQUEST_MAX_PDN_CONNECTIONS >= pdn_connections->num_pdn_connections);
+  DevAssert (pdn_connection );
 
   /*
    * Start section for grouped IE: PDN connection
@@ -368,37 +303,35 @@ s10_pdn_connection_ie_set ( nw_gtpv2c_msg_handle_t * msg, void * arg){
   rc = nwGtpv2cMsgGroupedIeStart (*msg, NW_GTPV2C_IE_PDN_CONNECTION, NW_GTPV2C_IE_INSTANCE_ZERO);
   DevAssert (NW_OK == rc);
 
-  for (i = 0; i < pdn_connections->num_pdn_connections; i++) {
-    /** APN IE Set. */
-    s10_apn_ie_set (msg, pdn_connections->pdn_connection[i].apn_str);
+  /** APN IE Set. */
+  s10_apn_ie_set (msg, pdn_connection->apn_str);
 
-    /** Set the IPv4 Address. */
-    s10_ipv4_address_ie_set(msg, &(pdn_connections->pdn_connection[i].ipv4_address));
+  /** Set the IPv4 Address. */
+  s10_ipv4_address_ie_set(msg, &(pdn_connection->ipv4_address));
 
-    /** Set the IPv6 Address. */
-    if(pdn_connections->pdn_connection[i].ipv6_prefix_length){
-      s10_ipv6_address_ie_set(msg, &(pdn_connections->pdn_connection[i].ipv6_address));
-    }
-
-    /** EBI Set. */
-    s10_ebi_ie_set (msg, pdn_connections->pdn_connection[i].linked_eps_bearer_id);
-
-    /** Set the S5/S8 FTEID. */
-    rc = nwGtpv2cMsgAddIeFteid (*msg, NW_GTPV2C_IE_INSTANCE_ZERO,
-        S5_S8_PGW_GTP_C,
-        pdn_connections->pdn_connection[i].pgw_address_for_cp.teid,
-        pdn_connections->pdn_connection[i].pgw_address_for_cp.ipv4 ? &pdn_connections->pdn_connection[i].pgw_address_for_cp.ipv4_address : 0,
-            pdn_connections->pdn_connection[i].pgw_address_for_cp.ipv6 ? &pdn_connections->pdn_connection[i].pgw_address_for_cp.ipv6_address : NULL);
-    DevAssert (NW_OK == rc);
-
-    /** Set APN Restriction IE. */
-    s10_apn_restriction_ie_set(msg, 0x00);
-    /** Set AMBR IE. */
-    gtpv2c_ambr_ie_set(msg, &(pdn_connections->pdn_connection[i].apn_ambr));
-
-    /** Set the PDN connection (another concatenated grouped IE). */
-    s10_bearer_context_to_create_ie_set(msg, &(pdn_connections->pdn_connection[i].bearer_context_list));
+  /** Set the IPv6 Address. */
+  if(pdn_connection->ipv6_prefix_length){
+    s10_ipv6_address_ie_set(msg, &(pdn_connection->ipv6_address));
   }
+
+  /** EBI Set. */
+  s10_ebi_ie_set (msg, pdn_connection->linked_eps_bearer_id);
+
+  /** Set the S5/S8 FTEID. */
+  rc = nwGtpv2cMsgAddIeFteid (*msg, NW_GTPV2C_IE_INSTANCE_ZERO,
+      S5_S8_PGW_GTP_C,
+      pdn_connection->pgw_address_for_cp.teid,
+      pdn_connection->pgw_address_for_cp.ipv4 ? &pdn_connection->pgw_address_for_cp.ipv4_address : 0,
+          pdn_connection->pgw_address_for_cp.ipv6 ? &pdn_connection->pgw_address_for_cp.ipv6_address : NULL);
+  DevAssert (NW_OK == rc);
+
+  /** Set APN Restriction IE. */
+  s10_apn_restriction_ie_set(msg, 0x00);
+  /** Set AMBR IE. */
+  gtpv2c_ambr_ie_set(msg, &(pdn_connection->apn_ambr));
+
+  /** Set the PDN connection (another concatenated grouped IE). */
+  s10_bearer_context_to_create_ie_set(msg, &(pdn_connection->bearer_context_list));
 
   /*
    * End section for grouped IE: PDN connection
@@ -410,24 +343,18 @@ s10_pdn_connection_ie_set ( nw_gtpv2c_msg_handle_t * msg, void * arg){
 }
 
 nw_rc_t
-s10_pdn_connection_ie_get (
+s10_pdn_connections_ie_get (
   uint8_t ieType,
   uint16_t ieLength,
   uint8_t ieInstance,
   uint8_t * ieValue,
   void *arg)
 {
-  mme_ue_eps_pdn_connections_t         *pdn_connections = (mme_ue_eps_pdn_connections_t *) arg;
-  uint8_t                               current_pdn_connection = pdn_connections->num_pdn_connections;
+  mme_ue_eps_pdn_connections_t           *pdn_connections = (mme_ue_eps_pdn_connections_t *) arg;
   DevAssert (pdn_connections );
-  DevAssert (0 <= current_pdn_connection);
-  DevAssert (MSG_FORWARD_RELOCATION_REQUEST_MAX_PDN_CONNECTIONS >= current_pdn_connection + 1);
-  pdn_connection_t                       *pdn_connection = &pdn_connections->pdn_connection[current_pdn_connection];
   uint8_t                                 read = 0;
-  nw_rc_t                                   rc;
-
-//  memset (&pdn_connection, 0, sizeof (pdn_connection_t));
-
+  nw_rc_t                                 rc;
+  pdn_connection_t                       *pdn_connection = &pdn_connections->pdn_connection[pdn_connections->num_pdn_connections];
   while (ieLength > read) {
     nw_gtpv2c_ie_tlv_t                         *ie_p;
 
@@ -491,7 +418,7 @@ s10_pdn_connection_ie_get (
 
     read += (ntohs (ie_p->l) + sizeof (nw_gtpv2c_ie_tlv_t));
   }
-  pdn_connections->num_pdn_connections += 1;
+  pdn_connections->num_pdn_connections++;
   return NW_OK;
 }
 
@@ -985,26 +912,6 @@ s10_ebi_ie_get (
   DevAssert (ebi );
   *ebi = ieValue[0] & 0x0F;
   OAILOG_DEBUG (LOG_S10, "\t- EBI %u\n", *ebi);
-  return NW_OK;
-}
-
-nw_rc_t
-s10_ebi_ie_get_list (
-  uint8_t ieType,
-  uint16_t ieLength,
-  uint8_t ieInstance,
-  uint8_t * ieValue,
-  void *arg)
-{
-  ebi_list_t                             *ebi_list = (ebi_list_t*)arg;
-  DevAssert (ebi_list);
-  DevAssert (RELEASE_ACCESS_BEARER_MAX_BEARERS > ebi_list->num_ebi);
-  uint8_t                                *ebi = (uint8_t *)&ebi_list->ebis[ebi_list->num_ebi];
-
-  DevAssert (ebi );
-  *ebi = ieValue[0] & 0x0F;
-  OAILOG_DEBUG (LOG_S10, "\t- EBI %u\n", *ebi);
-  ebi_list->num_ebi += 1;
   return NW_OK;
 }
 
@@ -1995,95 +1902,6 @@ s10_ue_time_zone_ie_set (
   rc = nwGtpv2cMsgAddIe (*msg, NW_GTPV2C_IE_UE_TIME_ZONE, 2, 0, value);
   DevAssert (NW_OK == rc);
   return RETURNok;
-}
-
-nw_rc_t
-s10_target_identification_ie_get (
-  uint8_t ieType,
-  uint16_t ieLength,
-  uint8_t ieInstance,
-  uint8_t * ieValue,
-  void *arg)
-{
-  target_identification_t                *target_identification = (target_identification_t *) arg;
-
-  DevAssert (target_identification );
-  target_identification->target_type = ieValue[0];
-
-  target_identification->mcc[1] = (ieValue[1] & 0xF0) >> 4;
-  target_identification->mcc[0] = (ieValue[1] & 0x0F);
-  target_identification->mcc[2] = (ieValue[2] & 0x0F);
-
-  if ((ieValue[1] & 0xF0) == 0xF0) {
-    /*
-     * Two digits MNC
-     */
-    target_identification->mnc[0] = 0;
-    target_identification->mnc[1] = (ieValue[3] & 0x0F);
-    target_identification->mnc[2] = (ieValue[3] & 0xF0) >> 4;
-  } else {
-    target_identification->mnc[0] = (ieValue[3] & 0x0F);
-    target_identification->mnc[1] = (ieValue[3] & 0xF0) >> 4;
-    target_identification->mnc[2] = (ieValue[2] & 0xF0) >> 4;
-  }
-
-  switch (target_identification->target_type) {
-  case TARGET_ID_RNC_ID:{
-      target_identification->target_id.rnc_id.lac = (ieValue[4] << 8) | ieValue[5];
-      target_identification->target_id.rnc_id.rac = ieValue[6];
-
-      if (ieLength == 11) {
-        /*
-         * Extended RNC id
-         */
-        target_identification->target_id.rnc_id.rnc_id = (ieValue[7] << 24) | (ieValue[8] << 16) | (ieValue[9] << 8) | (ieValue[10]);
-      } else if (ieLength == 9) {
-        /*
-         * Normal RNC id
-         */
-        target_identification->target_id.rnc_id.rnc_id = (ieValue[7] << 8) | ieValue[8];
-      } else {
-        /*
-         * This case is not possible
-         */
-        return NW_GTPV2C_IE_INCORRECT;
-      }
-
-      OAILOG_DEBUG (LOG_S10, "\t\t- LAC 0x%04x\n", target_identification->target_id.rnc_id.lac);
-      OAILOG_DEBUG (LOG_S10, "\t\t- RAC 0x%02x\n", target_identification->target_id.rnc_id.rac);
-      OAILOG_DEBUG (LOG_S10, "\t\t- RNC 0x%08x\n", target_identification->target_id.rnc_id.rnc_id);
-    }
-    break;
-
-  case TARGET_ID_MACRO_ENB_ID:{
-      if (ieLength != 9) {
-        return NW_GTPV2C_IE_INCORRECT;
-      }
-
-      target_identification->target_id.macro_enb_id.enb_id = ((ieValue[4] & 0x0F) << 16) | (ieValue[5] << 8) | ieValue[6];
-      target_identification->target_id.macro_enb_id.tac = (ieValue[7] << 8) | ieValue[8];
-      OAILOG_DEBUG (LOG_S10, "\t\t- ENB Id 0x%06x\n", target_identification->target_id.macro_enb_id.enb_id);
-      OAILOG_DEBUG (LOG_S10, "\t\t- TAC    0x%04x\n", target_identification->target_id.macro_enb_id.tac);
-    }
-    break;
-
-  case TARGET_ID_HOME_ENB_ID:{
-      if (ieLength != 10) {
-        return NW_GTPV2C_IE_INCORRECT;
-      }
-
-      target_identification->target_id.home_enb_id.enb_id = ((ieValue[4] & 0x0F) << 14) | (ieValue[5] << 16) | (ieValue[6] << 8) | ieValue[7];
-      target_identification->target_id.home_enb_id.tac = (ieValue[8] << 8) | ieValue[9];
-      OAILOG_DEBUG (LOG_S10, "\t\t- ENB Id 0x%07x\n", target_identification->target_id.home_enb_id.enb_id);
-      OAILOG_DEBUG (LOG_S10, "\t\t- TAC    0x%04x\n", target_identification->target_id.home_enb_id.tac);
-    }
-    break;
-
-  default:
-    return NW_GTPV2C_IE_INCORRECT;
-  }
-
-  return NW_OK;
 }
 
 nw_rc_t

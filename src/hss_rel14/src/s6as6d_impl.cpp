@@ -19,6 +19,7 @@
 #include <sstream>
 #include "s6as6d_impl.h"
 #include "fdjson.h"
+#include "options.h"
 #include "common_def.h"
 #include "s6t.h"
 #include "s6t_impl.h"
@@ -166,7 +167,7 @@ void UPLRreq::processAnswer( FDMessageAnswer &ans )
 
 void display_error_message(const char *err_msg)
 {
-
+  std::cerr << "Error: " << err_msg << std::endl;
 }
 
 // Function invoked when a UPLR Command is received
@@ -627,10 +628,12 @@ req->dump();
 
         if(air.visited_plmn_id.get(plmn_id, plmn_len)){
             if(plmn_len == 3 ){
-                if (apply_access_restriction ((char*)imsi_str.c_str(), plmn_id) != 0) {
-                  result_code = DIAMETER_ERROR_ROAMING_NOT_ALLOWED;
-                  experimental = true;
-                  break;
+                if (! Options::getroamallow()) {
+                  if (apply_access_restriction ((char*)imsi_str.c_str(), plmn_id) != 0) {
+                    result_code = DIAMETER_ERROR_ROAMING_NOT_ALLOWED;
+                    experimental = true;
+                    break;
+                  }
                 }
             }
             else{

@@ -92,6 +92,7 @@ int sgw_config_parse_file (sgw_config_t * config_pP)
   char                                   *sgw_if_name_S11 = NULL;
   char                                   *S11 = NULL;
   libconfig_int                           sgw_udp_port_S1u_S12_S4_up = 2152;
+  libconfig_int                           sgw_udp_port_S11 = 2123;
   config_setting_t                       *subsetting = NULL;
   const char                             *astring = NULL;
   bstring                                 address = NULL;
@@ -128,9 +129,6 @@ int sgw_config_parse_file (sgw_config_t * config_pP)
     config_pP->log_config.gtpv1u_log_level   = MAX_LOG_LEVEL;
     config_pP->log_config.gtpv2c_log_level   = MAX_LOG_LEVEL;
     config_pP->log_config.sctp_log_level     = MAX_LOG_LEVEL;
-    config_pP->log_config.s1ap_log_level     = MAX_LOG_LEVEL;
-    config_pP->log_config.nas_log_level      = MAX_LOG_LEVEL;
-    config_pP->log_config.mme_app_log_level  = MAX_LOG_LEVEL;
     config_pP->log_config.spgw_app_log_level = MAX_LOG_LEVEL;
     config_pP->log_config.s11_log_level      = MAX_LOG_LEVEL;
     config_pP->log_config.s6a_log_level      = MAX_LOG_LEVEL;
@@ -253,6 +251,12 @@ int sgw_config_parse_file (sgw_config_t * config_pP)
             inet_ntoa (in_addr_var), config_pP->ipv4.netmask_S11, bdata(config_pP->ipv4.if_name_S11));
         bdestroy_wrapper (&cidr);
       }
+      if (config_setting_lookup_int (subsetting, SGW_CONFIG_STRING_SGW_UDP_PORT_FOR_S11, &sgw_udp_port_S11)
+        ) {
+        config_pP->udp_port_S11 = sgw_udp_port_S11;
+      } else {
+        config_pP->udp_port_S11 = sgw_udp_port_S11;
+      }
 
       if (config_setting_lookup_int (subsetting, SGW_CONFIG_STRING_SGW_UDP_PORT_FOR_S1U_S12_S4_UP, &sgw_udp_port_S1u_S12_S4_up)
         ) {
@@ -261,35 +265,6 @@ int sgw_config_parse_file (sgw_config_t * config_pP)
         config_pP->udp_port_S1u_S12_S4_up = sgw_udp_port_S1u_S12_S4_up;
       }
     }
-    #if ENABLE_OPENFLOW
-    config_setting_t* ovs_settings = config_setting_get_member (setting_sgw, SGW_CONFIG_STRING_OVS_CONFIG);
-    if (ovs_settings == NULL) {
-      AssertFatal(false, "Couldn't find OVS subsetting in spgw config\n");
-    }
-    char* ovs_bridge_name = NULL;
-    char* l2_egress_port = NULL;
-    libconfig_int gtpu_udp_port_num = 0;
-    libconfig_int egress_port_num = 0;
-    libconfig_int gtp_port_num = 0;
-    char* uplink_mac = NULL;
-    if (config_setting_lookup_string (ovs_settings, SGW_CONFIG_STRING_OVS_BRIDGE_NAME, (const char **)&ovs_bridge_name)
-        && config_setting_lookup_int (ovs_settings, SGW_CONFIG_STRING_OVS_UDP_PORT_FOR_S1U, &gtpu_udp_port_num)
-        && config_setting_lookup_int (ovs_settings, SGW_CONFIG_STRING_OVS_EGRESS_PORT_NUM, &egress_port_num)
-        && config_setting_lookup_int (ovs_settings, SGW_CONFIG_STRING_OVS_GTP_PORT_NUM, &gtp_port_num)
-        && config_setting_lookup_string (ovs_settings, SGW_CONFIG_STRING_OVS_L2_EGRESS_PORT, (const char **)&l2_egress_port)
-        && config_setting_lookup_string (ovs_settings, SGW_CONFIG_STRING_OVS_UPLINK_MAC, (const char **)&uplink_mac)
-        ) {
-      config_pP->ovs_config.bridge_name = bfromcstr (ovs_bridge_name);
-      config_pP->ovs_config.gtpu_udp_port_num = gtpu_udp_port_num;
-      config_pP->ovs_config.egress_port_num = egress_port_num;
-      config_pP->ovs_config.gtp_port_num = gtp_port_num;
-      config_pP->ovs_config.uplink_mac = bfromcstr (uplink_mac);
-      config_pP->ovs_config.l2_egress_port = bfromcstr (l2_egress_port);
-    } else {
-      AssertFatal(false, "Couldn't find all ovs settings in spgw config\n");
-    }
-
-    #endif
   }
 
   config_destroy (&cfg);
@@ -305,7 +280,7 @@ void sgw_config_display (sgw_config_t * config_p)
   OAILOG_INFO (LOG_SPGW_APP, "- File .................................: %s\n", bdata(config_p->config_file));
 
   OAILOG_INFO (LOG_SPGW_APP, "- S1-U:\n");
-  OAILOG_INFO (LOG_SPGW_APP, "    port number ......: %d\n", config_p->udp_port_S1u_S12_S4_up);
+  OAILOG_INFO (LOG_SPGW_APP, "    S1u port .............: %d\n", config_p->udp_port_S1u_S12_S4_up);
   OAILOG_INFO (LOG_SPGW_APP, "    S1u_S12_S4 iface .....: %s\n", bdata(config_p->ipv4.if_name_S1u_S12_S4_up));
   OAILOG_INFO (LOG_SPGW_APP, "    S1u_S12_S4 ip ........: %s/%u\n", inet_ntoa (config_p->ipv4.S1u_S12_S4_up), config_p->ipv4.netmask_S1u_S12_S4_up);
   OAILOG_INFO (LOG_SPGW_APP, "- S5-S8:\n");
@@ -314,20 +289,10 @@ void sgw_config_display (sgw_config_t * config_p)
   OAILOG_INFO (LOG_SPGW_APP, "- S11:\n");
   OAILOG_INFO (LOG_SPGW_APP, "    S11 iface ............: %s\n", bdata(config_p->ipv4.if_name_S11));
   OAILOG_INFO (LOG_SPGW_APP, "    S11 ip ...............: %s/%u\n", inet_ntoa (config_p->ipv4.S11), config_p->ipv4.netmask_S11);
+  OAILOG_INFO (LOG_SPGW_APP, "    S11 port .............: %u\n", config_p->udp_port_S11);
   OAILOG_INFO (LOG_SPGW_APP, "- ITTI:\n");
   OAILOG_INFO (LOG_SPGW_APP, "    queue size .......: %u (bytes)\n", config_p->itti_config.queue_size);
   OAILOG_INFO (LOG_SPGW_APP, "    log file .........: %s\n", bdata(config_p->itti_config.log_file));
-
-#if ENABLE_OPENFLOW
-  OAILOG_INFO (LOG_SPGW_APP, "- OpenVSwitch:\n");
-  OAILOG_INFO (LOG_SPGW_APP, "    bridge_name .........: %s\n", bdata(config_p->ovs_config.bridge_name));
-  OAILOG_INFO (LOG_SPGW_APP, "    gtpu_udp_port_num ...: %d\n", config_p->ovs_config.gtpu_udp_port_num);
-  OAILOG_INFO (LOG_SPGW_APP, "    egress_port_num .....: %d\n", config_p->ovs_config.egress_port_num);
-  OAILOG_INFO (LOG_SPGW_APP, "    gtp_port_num ........: %d\n", config_p->ovs_config.gtp_port_num);
-  OAILOG_INFO (LOG_SPGW_APP, "    uplink_mac ..........: %s\n", bdata(config_p->ovs_config.uplink_mac));
-  OAILOG_INFO (LOG_SPGW_APP, "    l2_egress_port ......: %s\n", bdata(config_p->ovs_config.l2_egress_port));
-#endif
-
 
   OAILOG_INFO (LOG_SPGW_APP, "- Logging:\n");
   OAILOG_INFO (LOG_SPGW_APP, "    Output ..............: %s\n", bdata(config_p->log_config.output));

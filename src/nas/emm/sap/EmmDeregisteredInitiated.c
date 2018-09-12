@@ -134,10 +134,10 @@ EmmDeregisteredInitiated (
     MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_ATTACH_REJ ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
     break;
 
-  case _EMMREG_ATTACH_ABORT:
-    OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_DEREGISTERED_INITIATED - Primitive _EMMREG_ATTACH_ABORT is not valid\n");
-    MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_ATTACH_ABORT ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
-    break;
+//  case _EMMREG_ATTACH_ABORT:
+//    OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_DEREGISTERED_INITIATED - Primitive _EMMREG_ATTACH_ABORT is not valid\n");
+//    MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_ATTACH_ABORT ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
+//    break;
 
   case _EMMREG_DETACH_INIT:
     OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_DEREGISTERED_INITIATED - Primitive _EMMREG_DETACH_INIT is not valid\n");
@@ -228,6 +228,7 @@ EmmDeregisteredInitiated (
   case _EMMREG_LOWERLAYER_RELEASE:
     MSC_LOG_RX_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_LOWERLAYER_RELEASE ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
     nas_delete_all_emm_procedures(emm_ctx);
+    nas_delete_all_esm_procedures(emm_ctx);
     rc = RETURNok;
     break;
 

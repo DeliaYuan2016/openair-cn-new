@@ -74,6 +74,22 @@ gtpv2c_ambr_ie_get (
   uint8_t * ieValue,
   void *arg);
 
+/* Target Identification Information Element
+ * 3GPP TS 29.274 #8.51
+ */
+nw_rc_t
+gtpv2c_target_identification_ie_get (
+  uint8_t ieType,
+  uint16_t ieLength,
+  uint8_t ieInstance,
+  uint8_t * ieValue,
+  void *arg);
+
+int
+gtpv2c_target_identification_ie_set (
+  nw_gtpv2c_msg_handle_t * msg,
+  const target_identification_t * target_identification);
+
 /* Allocation/Retention Priority (ARP) */
 nw_rc_t
 gtpv2c_arp_ie_set (
@@ -81,6 +97,18 @@ gtpv2c_arp_ie_set (
 
 nw_rc_t
 gtpv2c_arp_ie_get (
+  uint8_t ieType,
+  uint16_t ieLength,
+  uint8_t ieInstance,
+  uint8_t * ieValue,
+  void *arg);
+
+nw_rc_t
+gtpv2c_selection_mode_ie_set (
+    nw_gtpv2c_msg_handle_t * msg, SelectionMode_t * sm);
+
+nw_rc_t
+gtpv2c_selection_mode_ie_get (
   uint8_t ieType,
   uint16_t ieLength,
   uint8_t ieInstance,

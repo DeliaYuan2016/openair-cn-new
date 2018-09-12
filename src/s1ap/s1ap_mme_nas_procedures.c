@@ -93,6 +93,10 @@ s1ap_mme_handle_initial_ue_message (
   enb_ue_s1ap_id = (enb_ue_s1ap_id_t) (initialUEMessage_p->eNB_UE_S1AP_ID & 0x00ffffff);
   ue_ref = s1ap_is_ue_enb_id_in_list (eNB_ref, enb_ue_s1ap_id);
 
+  if (initialUEMessage_p->presenceMask & S1AP_INITIALUEMESSAGEIES_GUMMEITYPE_PRESENT) {
+    OAILOG_WARNING (LOG_S1AP, " Received (unhandled) GUMMEI-Type %d\n", initialUEMessage_p->gummeiType);
+  }
+
   if (ue_ref == NULL) {
     tai_t                                   tai = {0};
     gummei_t                                gummei = {.plmn = {0}, .mme_code = 0, .mme_gid = 0}; // initialized after
@@ -121,6 +125,9 @@ s1ap_mme_handle_initial_ue_message (
     ue_ref->s1ap_ue_context_rel_timer.id  = S1AP_TIMER_INACTIVE_ID;
     ue_ref->s1ap_ue_context_rel_timer.sec = S1AP_UE_CONTEXT_REL_COMP_TIMER;
 
+    ue_ref->s1ap_handover_completion_timer.id  = S1AP_TIMER_INACTIVE_ID;
+    ue_ref->s1ap_handover_completion_timer.sec = S1AP_HANDOVER_COMPLETION_TIMER;
+
     // On which stream we received the message
     ue_ref->sctp_stream_recv = stream;
     ue_ref->sctp_stream_send = ue_ref->enb->next_sctp_stream;
@@ -147,6 +154,8 @@ s1ap_mme_handle_initial_ue_message (
     DevAssert (initialUEMessage_p->eutran_cgi.pLMNidentity.size == 3);
     TBCD_TO_PLMN_T(&initialUEMessage_p->eutran_cgi.pLMNidentity, &ecgi.plmn);
     BIT_STRING_TO_CELL_IDENTITY (&initialUEMessage_p->eutran_cgi.cell_ID, ecgi.cell_identity);
+    /** Set the ENB Id. */
+    ecgi.cell_identity.enb_id = eNB_ref->enb_id;
 
     if (initialUEMessage_p->presenceMask & S1AP_INITIALUEMESSAGEIES_S_TMSI_PRESENT) {
       OCTET_STRING_TO_MME_CODE(&initialUEMessage_p->s_tmsi.mMEC, s_tmsi.mme_code);
@@ -578,6 +587,108 @@ int s1ap_generate_s1ap_e_rab_setup_req (itti_s1ap_e_rab_setup_req_t * const e_ra
 }
 
 //------------------------------------------------------------------------------
+int s1ap_generate_s1ap_e_rab_release_req (itti_s1ap_e_rab_release_req_t * const e_rab_release_req)
+{
+  OAILOG_FUNC_IN (LOG_S1AP);
+  ue_description_t                       *ue_ref = NULL;
+  uint8_t                                *buffer_p = NULL;
+  uint32_t                                length = 0;
+  void                                   *id = NULL;
+  const enb_ue_s1ap_id_t                  enb_ue_s1ap_id = e_rab_release_req->enb_ue_s1ap_id;
+  const mme_ue_s1ap_id_t                  ue_id       = e_rab_release_req->mme_ue_s1ap_id;
+
+  hashtable_ts_get (&g_s1ap_mme_id2assoc_id_coll, (const hash_key_t)ue_id, (void **)&id);
+  if (id) {
+    sctp_assoc_id_t sctp_assoc_id = (sctp_assoc_id_t)(uintptr_t)id;
+    enb_description_t  *enb_ref = s1ap_is_enb_assoc_id_in_list (sctp_assoc_id);
+    if (enb_ref) {
+      ue_ref = s1ap_is_ue_enb_id_in_list (enb_ref,enb_ue_s1ap_id);
+    }
+  }
+  // TODO remove soon:
+  if (!ue_ref) {
+    ue_ref = s1ap_is_ue_mme_id_in_list (ue_id);
+  }
+  // finally!
+  if (!ue_ref) {
+    /*
+     * If the UE-associated logical S1-connection is not established,
+     * * * * the MME shall allocate a unique MME UE S1AP ID to be used for the UE.
+     */
+    OAILOG_DEBUG (LOG_S1AP, "Unknown UE MME ID " MME_UE_S1AP_ID_FMT ", This case is not handled right now\n", ue_id);
+    OAILOG_FUNC_RETURN (LOG_S1AP, RETURNerror);
+  } else {
+    /*
+     * We have found the UE in the list.
+     * Create new IE list message and encode it.
+     */
+    S1ap_E_RABReleaseCommandIEs_t          *e_rabreleasecommandies = NULL;
+    s1ap_message                            message = {0};
+
+    message.procedureCode = S1ap_ProcedureCode_id_E_RABRelease;
+    message.direction = S1AP_PDU_PR_initiatingMessage;
+    ue_ref->s1_ue_state = S1AP_UE_CONNECTED;
+    e_rabreleasecommandies = &message.msg.s1ap_E_RABReleaseCommandIEs;
+    /*
+     * Setting UE informations with the ones found in ue_ref
+     */
+    e_rabreleasecommandies->mme_ue_s1ap_id = ue_ref->mme_ue_s1ap_id;
+    e_rabreleasecommandies->eNB_UE_S1AP_ID = ue_ref->enb_ue_s1ap_id;
+    /*eNB
+     * Fill in the NAS pdu
+     */
+    e_rabreleasecommandies->presenceMask = 0;
+//    if (e_rab_release_req->ue_aggregate_maximum_bit_rate_present) {
+//      e_rabreleasecommandies->presenceMask |= S1AP_E_RABRELEASECOMMANDIES_UEAGGREGATEMAXIMUMBITRATE_PRESENT;
+//      TO DO e_rabreleasecommandies->uEaggregateMaximumBitrate.uEaggregateMaximumBitRateDL.buf
+//    }
+
+    S1ap_E_RABItem_t s1ap_E_RABItem[e_rab_release_req->e_rab_to_be_release_list.no_of_items];
+
+    for  (int i= 0; i < e_rab_release_req->e_rab_to_be_release_list.no_of_items; i++) {
+      memset(&s1ap_E_RABItem[i], 0, sizeof(S1ap_E_RABItem_t));
+
+      s1ap_E_RABItem[i].e_RAB_ID = e_rab_release_req->e_rab_to_be_release_list.item[i].e_rab_id;
+      /** Set Id-Cause. */
+      s1ap_E_RABItem[i].cause.present = S1ap_Cause_PR_nas;
+      s1ap_E_RABItem[i].cause.choice.nas = 0;
+
+      ASN_SEQUENCE_ADD (&e_rabreleasecommandies->e_RABToBeReleasedList, &s1ap_E_RABItem[i]);
+//      }
+    }
+
+    /** Set the NAS message outside of the EBI list. */
+    if(e_rab_release_req->nas_pdu){
+      e_rabreleasecommandies->presenceMask |=
+          S1AP_E_RABRELEASECOMMANDIES_NAS_PDU_PRESENT;
+      OCTET_STRING_fromBuf (&e_rabreleasecommandies->nas_pdu, (char *)bdata(e_rab_release_req->nas_pdu),
+          blength(e_rab_release_req->nas_pdu));
+    }else{
+      OAILOG_INFO(LOG_S1AP, "No NAS message received for S1AP E-RAB release command for ueId " MME_UE_S1AP_ID_FMT" .\n", e_rab_release_req->mme_ue_s1ap_id);
+    }
+
+    if (s1ap_mme_encode_pdu (&message, &buffer_p, &length) < 0) {
+      // TODO: handle something
+      OAILOG_ERROR (LOG_S1AP, "Encoding of s1ap_E_RABReleaseCommandIEs failed \n");
+      OAILOG_FUNC_RETURN (LOG_S1AP, RETURNerror);
+    }
+
+    OAILOG_NOTICE (LOG_S1AP, "Send S1AP E_RABRelease command MME_UE_S1AP_ID = " MME_UE_S1AP_ID_FMT " eNB_UE_S1AP_ID = " ENB_UE_S1AP_ID_FMT "\n",
+                (mme_ue_s1ap_id_t)e_rabreleasecommandies->mme_ue_s1ap_id, (enb_ue_s1ap_id_t)e_rabreleasecommandies->eNB_UE_S1AP_ID);
+    MSC_LOG_TX_MESSAGE (MSC_S1AP_MME,
+                        MSC_S1AP_ENB,
+                        NULL, 0,
+                        "0 E_RABSetup/initiatingMessage mme_ue_s1ap_id " MME_UE_S1AP_ID_FMT " enb_ue_s1ap_id" ENB_UE_S1AP_ID_FMT " nas length %u",
+                        (mme_ue_s1ap_id_t)e_rabreleasecommandies->mme_ue_s1ap_id, (enb_ue_s1ap_id_t)e_rabreleasecommandies->eNB_UE_S1AP_ID, length);
+    bstring b = blk2bstr(buffer_p, length);
+    s1ap_mme_itti_send_sctp_request (&b , ue_ref->enb->sctp_assoc_id, ue_ref->sctp_stream_send, ue_ref->mme_ue_s1ap_id);
+  }
+
+  OAILOG_FUNC_RETURN (LOG_S1AP, RETURNok);
+
+}
+
+//------------------------------------------------------------------------------
 void
 s1ap_handle_conn_est_cnf (
   const itti_mme_app_connection_establishment_cnf_t * const conn_est_cnf_pP)
@@ -793,38 +904,43 @@ s1ap_handle_path_switch_req_ack(
   pathSwitchRequestAcknowledge_p->mme_ue_s1ap_id = (unsigned long)ue_ref->mme_ue_s1ap_id;
   pathSwitchRequestAcknowledge_p->eNB_UE_S1AP_ID = (unsigned long)ue_ref->enb_ue_s1ap_id;
 
-
   /* Set the GTP-TEID. This is the S1-U S-GW TEID. */
 //  hash_table_ts_t * bearer_contexts_p = (hash_table_ts_t*)path_switch_req_ack_pP->bearer_ctx_to_be_switched_list.bearer_ctxs;
-//
 //  bearer_context_t * bearer_context_p = NULL;
 //  hashtable_ts_get ((hash_table_ts_t * const)bearer_contexts_p, (const hash_key_t)5, (void **)&bearer_context_p);
-//
 //  uint                                    offset = 0;
 //  S1ap_E_RABToBeSwitchedULItem_t          e_RABToBeSwitchedUl = {0}; // yes, alloc on stack
-//
-//  s1ap_add_bearer_context_to_switch_list(&pathSwitchRequestAcknowledge_p->e_RABToBeSwitchedULList, &e_RABToBeSwitchedUl, bearer_context_p);
-  // todo: @ Lionel: pathSwitchRequestAcknowledge_p->presenceMask |= S1AP_PATHSWITCHREQUESTACKNOWLEDGEIES_E_RABTOBESWITCHEDULLIST_PRESENT;
-//  /*
-//   * Only add capability information if it's not empty.
-//   */
-//  if (conn_est_cnf_pP->ue_radio_cap_length) {
-//    OAILOG_DEBUG (LOG_S1AP, "UE radio capability found, adding to message\n");
-//    initialContextSetupRequest_p->presenceMask |=
-//      S1AP_INITIALCONTEXTSETUPREQUESTIES_UERADIOCAPABILITY_PRESENT;
-//    OCTET_STRING_fromBuf(&initialContextSetupRequest_p->ueRadioCapability,
-//                        (const char*) conn_est_cnf_pP->ue_radio_capabilities,
-//                         conn_est_cnf_pP->ue_radio_cap_length);
-//    free_wrapper((void**) &(conn_est_cnf_pP->ue_radio_capabilities));
-//  }
+  /** Add the new forwarding IEs. */
+  if(path_switch_req_ack_pP->bearer_ctx_to_be_switched_list){
+    S1ap_IE_t *s1ap_ie_array[path_switch_req_ack_pP->bearer_ctx_to_be_switched_list->num_bearer_context];
+    if(path_switch_req_ack_pP->bearer_ctx_to_be_switched_list){
+      for(int num_bc = 0; num_bc < path_switch_req_ack_pP->bearer_ctx_to_be_switched_list->num_bearer_context; num_bc++){
+        struct S1ap_E_RABToBeSwitchedULItem ie_ul;
+        uint8_t ipv4_addr[4];
 
-//  /*
-//   * uEaggregateMaximumBitrateDL and uEaggregateMaximumBitrateUL expressed in term of bits/sec
-//   */
-//  asn_uint642INTEGER (&initialContextSetupRequest_p->uEaggregateMaximumBitrate.uEaggregateMaximumBitRateDL, conn_est_cnf_pP->ambr.br_dl);
-//  asn_uint642INTEGER (&initialContextSetupRequest_p->uEaggregateMaximumBitrate.uEaggregateMaximumBitRateUL, conn_est_cnf_pP->ambr.br_ul);
-//  e_RABToBeSetup.e_RAB_ID = conn_est_cnf_pP->eps_bearer_id;     //5;
-//  e_RABToBeSetup.e_RABlevelQoSParameters.qCI = conn_est_cnf_pP->bearer_qos_qci;
+        memset(&ie_ul, 0, sizeof(struct S1ap_E_RABToBeSwitchedULItem));
+        memset(&ipv4_addr, 0, sizeof(ipv4_addr));
+
+        ie_ul.e_RAB_ID = path_switch_req_ack_pP->bearer_ctx_to_be_switched_list->bearer_contexts[num_bc].eps_bearer_id;
+
+        GTP_TEID_TO_ASN1(path_switch_req_ack_pP->bearer_ctx_to_be_switched_list->bearer_contexts[num_bc].s1u_sgw_fteid.teid, &ie_ul.gTP_TEID);
+        ie_ul.transportLayerAddress.buf = ipv4_addr;
+        memcpy(ie_ul.transportLayerAddress.buf, (uint32_t*)&path_switch_req_ack_pP->bearer_ctx_to_be_switched_list->bearer_contexts[num_bc].s1u_sgw_fteid.ipv4_address.s_addr, 4);
+        ie_ul.transportLayerAddress.bits_unused = 0;
+        ie_ul.transportLayerAddress.size = 4;
+
+        s1ap_ie_array[num_bc] = s1ap_new_ie(S1ap_ProtocolIE_ID_id_E_RABToBeSwitchedULItem,
+            S1ap_Criticality_ignore,
+            &asn_DEF_S1ap_E_RABToBeSwitchedULItem,
+            &ie_ul);
+
+        ASN_SEQUENCE_ADD(&pathSwitchRequestAcknowledge_p->e_RABToBeSwitchedULList.s1ap_E_RABToBeSwitchedULItem, s1ap_ie_array[num_bc]);
+
+      }
+      pathSwitchRequestAcknowledge_p->presenceMask |= S1AP_PATHSWITCHREQUESTACKNOWLEDGEIES_E_RABTOBESWITCHEDULLIST_PRESENT;
+    }
+  }
+
 
   // todo: check if key exists :)
   pathSwitchRequestAcknowledge_p->securityContext.nextHopChainingCount = path_switch_req_ack_pP->ncc;
@@ -1134,7 +1250,8 @@ s1ap_handle_handover_request (
   handoverRequest_p = &message.msg.s1ap_HandoverRequestIEs;
   handoverRequest_p->mme_ue_s1ap_id = (unsigned long)handover_request_pP->ue_id;
 
-  S1ap_E_RABToBeSetupItemHOReq_t          e_RABToBeSetupHO = {0}; // yes, alloc on stack
+  S1ap_E_RABToBeSetupItemHOReq_t          e_RABToBeSetupHO[handover_request_pP->bearer_ctx_to_be_setup_list->num_bearer_context]; // yes, alloc on stack
+  memset(e_RABToBeSetupHO, 0, sizeof(e_RABToBeSetupHO));
   // todo: only a single bearer assumed right now.
   s1ap_add_bearer_context_to_setup_list(&handoverRequest_p->e_RABToBeSetupListHOReq, &e_RABToBeSetupHO, handover_request_pP->bearer_ctx_to_be_setup_list);
   // e_RABToBeSetupHO --> todo: disappears inside
@@ -1205,6 +1322,29 @@ s1ap_handle_handover_request (
   OAILOG_FUNC_OUT (LOG_S1AP);
 }
 
+static
+S1ap_IE_t * s1ap_generate_bearer_to_forward(S1ap_E_RABDataForwardingItem_t *ie_ul, bearer_context_created_t *bc_to_forward){
+
+  ie_ul->e_RAB_ID = 8;
+
+//  ie_ul.uL_TransportLayerAddress = calloc(1, sizeof (S1ap_TransportLayerAddress_t));
+
+
+  GTP_TEID_TO_ASN1(0x11223344, ie_ul->uL_GTP_TEID);
+  ie_ul->uL_TransportLayerAddress->buf[0] = 0xC0;
+  ie_ul->uL_TransportLayerAddress->buf[1] = 0xA8;
+  ie_ul->uL_TransportLayerAddress->buf[2] = 0x0F;
+  ie_ul->uL_TransportLayerAddress->buf[3] = 0x0A;
+  ie_ul->uL_TransportLayerAddress->bits_unused = 0;
+  ie_ul->uL_TransportLayerAddress->size = 4;
+
+  S1ap_IE_t *s1ap_ie = s1ap_new_ie(S1ap_ProtocolIE_ID_id_E_RABDataForwardingItem,
+      S1ap_Criticality_ignore,
+      &asn_DEF_S1ap_E_RABDataForwardingItem,
+      &ie_ul);
+  return s1ap_ie;
+}
+
 /**
  * Informing the source eNodeB about the successfully established handover.
  * Send the handover command to the source enb via the old s1ap ue_reference.
@@ -1223,6 +1363,14 @@ s1ap_handle_handover_command (
   S1ap_HandoverCommandIEs_t              *handoverCommand_p = NULL;
 
   s1ap_message                            message = {0}; // yes, alloc on stack
+
+  enb_description_t                      *enb_ref = NULL;
+
+  enb_ref = s1ap_is_enb_id_in_list(handover_command_pP->enb_id);
+  if(!enb_ref){
+    enb_ref = s1ap_is_enb_id_in_list(10);
+    enb_ref = s1ap_is_enb_id_in_list(256);
+  }
 
   OAILOG_FUNC_IN (LOG_S1AP);
   DevAssert (handover_command_pP != NULL);
@@ -1263,12 +1411,49 @@ s1ap_handle_handover_command (
        * We can safely free list of IE from sptr
       ASN_STRUCT_FREE_CONTENTS_ONLY (*td, sptr);
    */
+
+  /** Add the new forwarding IEs. */
+  S1ap_IE_t *s1ap_ie_array[handover_command_pP->bearer_ctx_to_be_forwarded_list->num_bearer_context];
+  if(handover_command_pP->bearer_ctx_to_be_forwarded_list){
+      for(int num_bc = 0; num_bc < handover_command_pP->bearer_ctx_to_be_forwarded_list->num_bearer_context; num_bc++){
+        struct S1ap_E_RABDataForwardingItem ie_ul;
+        S1ap_GTP_TEID_t ul_gtp_teid;
+        S1ap_TransportLayerAddress_t uL_TransportLayerAddress;
+        uint8_t ipv4_addr[4];
+
+        memset(&ul_gtp_teid, 0, sizeof(S1ap_GTP_TEID_t));
+        memset(&ie_ul, 0, sizeof(struct S1ap_E_RABDataForwardingItem));
+        memset(&uL_TransportLayerAddress, 0, sizeof(S1ap_TransportLayerAddress_t));
+        memset(&ipv4_addr, 0, sizeof(ipv4_addr));
+
+        ie_ul.e_RAB_ID = handover_command_pP->bearer_ctx_to_be_forwarded_list->bearer_contexts[num_bc].eps_bearer_id;
+        ie_ul.uL_GTP_TEID = &ul_gtp_teid;
+
+        GTP_TEID_TO_ASN1(handover_command_pP->bearer_ctx_to_be_forwarded_list->bearer_contexts[num_bc].s1u_sgw_fteid.teid, ie_ul.uL_GTP_TEID);
+        ie_ul.uL_TransportLayerAddress = &uL_TransportLayerAddress;
+        ie_ul.uL_TransportLayerAddress->buf = ipv4_addr;
+        memcpy(ie_ul.uL_TransportLayerAddress->buf, (uint32_t*)&handover_command_pP->bearer_ctx_to_be_forwarded_list->bearer_contexts[num_bc].s1u_sgw_fteid.ipv4_address.s_addr, 4);
+        ie_ul.uL_TransportLayerAddress->bits_unused = 0;
+        ie_ul.uL_TransportLayerAddress->size = 4;
+
+        s1ap_ie_array[num_bc] = s1ap_new_ie(S1ap_ProtocolIE_ID_id_E_RABDataForwardingItem,
+            S1ap_Criticality_ignore,
+            &asn_DEF_S1ap_E_RABDataForwardingItem,
+            &ie_ul);
+
+        ASN_SEQUENCE_ADD(&handoverCommand_p->e_RABSubjecttoDataForwardingList.s1ap_E_RABDataForwardingItem, s1ap_ie_array[num_bc]);
+
+      }
+      handoverCommand_p->presenceMask |= S1AP_HANDOVERCOMMANDIES_E_RABSUBJECTTODATAFORWARDINGLIST_PRESENT;
+  }
+
   OCTET_STRING_fromBuf(&handoverCommand_p->target_ToSource_TransparentContainer,
       handover_command_pP->eutran_target_to_source_container->data, blength(handover_command_pP->eutran_target_to_source_container));
 
   if (s1ap_mme_encode_pdu (&message, &buffer_p, &length) < 0) {
     DevMessage("Failed to encode handover command \n");
   }
+
   OAILOG_NOTICE (LOG_S1AP, "Send S1AP_HANDOVER_COMMAND message MME_UE_S1AP_ID = " MME_UE_S1AP_ID_FMT " eNB_UE_S1AP_ID = " ENB_UE_S1AP_ID_FMT "\n",
               (mme_ue_s1ap_id_t)handoverCommand_p->mme_ue_s1ap_id, (enb_ue_s1ap_id_t)handoverCommand_p->eNB_UE_S1AP_ID);
   MSC_LOG_TX_MESSAGE (MSC_S1AP_MME,
@@ -1278,8 +1463,13 @@ s1ap_handle_handover_command (
                       (mme_ue_s1ap_id_t)handoverCommand_p->mme_ue_s1ap_id,
                       (enb_ue_s1ap_id_t)handoverCommand_p->eNB_UE_S1AP_ID);
   bstring b = blk2bstr(buffer_p, length);
-  free(buffer_p);
+
   s1ap_mme_itti_send_sctp_request (&b, ue_ref->enb->sctp_assoc_id, ue_ref->sctp_stream_send, ue_ref->mme_ue_s1ap_id);
+  free(buffer_p);
+
+  for(int num_bc = 0; num_bc < handover_command_pP->bearer_ctx_to_be_forwarded_list->num_bearer_context; num_bc++){
+    free_wrapper(&s1ap_ie_array[num_bc]);
+  }
   /** Not changing the ECM state of the source eNB UE-Reference. */
   OAILOG_FUNC_OUT (LOG_S1AP);
 }
@@ -1481,7 +1671,7 @@ s1ap_handle_paging( const itti_s1ap_paging_t * const s1ap_paging_pP){
 
 //------------------------------------------------------------------------------
 static
-int s1ap_generate_bearer_context_to_setup(bearer_context_to_be_created_t * bc_tbc, S1ap_E_RABToBeSetupItemHOReq_t         * e_RABToBeSetupHO_p){
+int s1ap_generate_bearer_context_to_setup(bearer_context_to_be_created_t * bc_tbc, S1ap_E_RABToBeSetupItemHOReq_t         *e_RABToBeSetupHO_p){
   OAILOG_FUNC_IN (LOG_S1AP);
 
   uint                                    offset = 0;
@@ -1561,13 +1751,13 @@ s1ap_add_bearer_context_to_setup_list (S1ap_E_RABToBeSetupListHOReqIEs_t * const
 
   int num_bc = 0;
   for(int num_bc = 0; num_bc < bcs_tbc->num_bearer_context; num_bc++){
-    if(s1ap_generate_bearer_context_to_setup(&bcs_tbc->bearer_contexts[num_bc], e_RABToBeSetupHO_p) != RETURNok){
+    if(s1ap_generate_bearer_context_to_setup(&bcs_tbc->bearer_contexts[num_bc], &e_RABToBeSetupHO_p[num_bc]) != RETURNok){
       OAILOG_ERROR(LOG_S1AP, "Error adding bearer context with ebi %d to list of bearers to setup.\n", bcs_tbc->bearer_contexts[num_bc].eps_bearer_id);
       return false;
     }
+    /** Add the E-RAB bearer to the message. */
+    ASN_SEQUENCE_ADD (e_RABToBeSetupListHOReq_p, &e_RABToBeSetupHO_p[num_bc]);
   }
-  /** Add the E-RAB bearer to the message. */
-  ASN_SEQUENCE_ADD (e_RABToBeSetupListHOReq_p, e_RABToBeSetupHO_p);
   return true;
 }
 

@@ -77,12 +77,20 @@ check_install_hss_software() {
     echo_fatal "$OS_DISTRO is not a supported distribution."
   fi
   $SUDO $INSTALLER install $OPTION $PACKAGE_LIST
-  [[ $? -ne 0 ]] && return $?
+  ret=$?;[[ $ret -ne 0 ]] && return $ret
 
   # Libraries
   if [[ $OS_DISTRO == "ubuntu" ]]; then
+    case "$(get_distribution_release)" in
+	"ubuntu14.04" | "ubuntu16.04" | "ubuntu17.04" | "ubuntu17.10")
+	    specific_packages="libconfig8-dev"
+	    ;;
+	"ubuntu18.04")
+	    specific_packages="libconfig-dev"
+	    ;;
+    esac
     PACKAGE_LIST="\
-      libconfig8-dev \
+      $specific_packages \
       libgcrypt11-dev \
       libidn2-0-dev \
       libidn11-dev \
@@ -115,7 +123,7 @@ check_install_hss_software() {
     echo_fatal "$OS_DISTRO is not a supported distribution."
   fi
   $SUDO $INSTALLER install $OPTION $PACKAGE_LIST
-  [[ $? -ne 0 ]] && return $?
+  ret=$?;[[ $ret -ne 0 ]] && return $ret
 
   if [[ $OS_BASEDISTRO == 'fedora' ]]; then
     $SUDO systemctl enable mariadb
@@ -126,11 +134,11 @@ check_install_hss_software() {
     #Remove old gnutls/nettle installation that was done from sources
     remove_nettle_from_source
     $SUDO $INSTALLER install -y nettle-dev nettle-bin
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
   fi
 
   install_freediameter_from_source $1
-  [[ $? -ne 0 ]] && return $?
+  ret=$?;[[ $ret -ne 0 ]] && return $ret
 
   case "$(get_distribution_release)" in
     "ubuntu14.04")
@@ -138,7 +146,7 @@ check_install_hss_software() {
         python-mysqldb \
         pkg-config"
       ;;
-    "ubuntu16.04")
+    "ubuntu16.04" | "ubuntu17.04" | "ubuntu17.10" | "ubuntu18.04")
       PACKAGE_LIST="\
         python-pexpect \
         python-mysqldb"

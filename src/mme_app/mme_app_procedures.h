@@ -56,7 +56,6 @@ typedef struct mme_app_base_proc_s {
 typedef enum {
   MME_APP_S10_PROC_TYPE_NONE = 0,
   MME_APP_S10_PROC_TYPE_INTER_MME_HANDOVER,
-//  MME_APP_S10_PROC_TYPE_INTER_MME_TAU,
   MME_APP_S10_PROC_TYPE_INTRA_MME_HANDOVER
 } mme_app_s10_proc_type_t;
 
@@ -101,6 +100,8 @@ typedef struct mme_app_s10_proc_mme_handover_s {
   uint8_t                       next_processed_pdn_connection;
 
   /** Target Information to store on the source side. */
+//  S1ap_ENB_ID_PR                target_enb_type;
+
   tai_t                         target_tai;
   bool                          ho_command_sent;
   ecgi_t                        source_ecgi;  /**< Source home/macro enb id. */
@@ -113,7 +114,8 @@ typedef struct mme_app_s10_proc_mme_handover_s {
 /* S11 */
 typedef enum {
   MME_APP_S11_PROC_TYPE_NONE = 0,
-  MME_APP_S11_PROC_TYPE_CREATE_BEARER
+  MME_APP_S11_PROC_TYPE_CREATE_BEARER,
+  MME_APP_S11_PROC_TYPE_DELETE_BEARER
 } mme_app_s11_proc_type_t;
 
 typedef struct mme_app_s11_proc_s {
@@ -132,15 +134,25 @@ typedef enum {
 
 typedef struct mme_app_s11_proc_create_bearer_s {
   mme_app_s11_proc_t           proc;
-  int                          num_bearers;
+  int                          num_bearers_unhandled;
   int                          num_status_received;
+
+  ebi_t                        linked_ebi;
+  pdn_cid_t                    pci;
+
   // TODO here give a NAS/S1AP/.. reason -> GTPv2-C reason
-  s11_proc_bearer_status_t     bearer_status[BEARERS_PER_UE];
-
-  LIST_HEAD(bearer_contexts_sucess_s, bearer_context_s) *bearer_contexts_success;
-  LIST_HEAD(bearer_contexts_failed_s, bearer_context_s) *bearer_contexts_failed;
-
+  bearer_contexts_to_be_created_t *bcs_tbc; /**< Store the bearer contexts to be created here, and don't register them yet in the MME_APP context. */
 } mme_app_s11_proc_create_bearer_t;
+
+typedef struct mme_app_s11_proc_delete_bearer_s {
+  mme_app_s11_proc_t           proc;
+  int                          num_bearers_unhandled;
+  int                          num_status_received;
+  ebi_list_t                   ebis;
+
+  // TODO here give a NAS/S1AP/.. reason -> GTPv2-C reason
+  bearer_contexts_to_be_removed_t bcs_failed; /**< Store the bearer contexts to be created here, and don't register them yet in the MME_APP context. */
+} mme_app_s11_proc_delete_bearer_t;
 
 typedef enum {
   MME_APP_S1AP_PROC_TYPE_NONE = 0,
@@ -151,10 +163,14 @@ typedef enum {
 //RB_PROTOTYPE(BearerFteids, fteid_set_s, fteid_set_rbt_Node, fteid_set_compare_s1u_saegw)
 
 void mme_app_delete_s11_procedures(ue_context_t * const ue_context_p);
+
 mme_app_s11_proc_create_bearer_t* mme_app_create_s11_procedure_create_bearer(ue_context_t * const ue_context_p);
 mme_app_s11_proc_create_bearer_t* mme_app_get_s11_procedure_create_bearer(ue_context_t * const ue_context_p);
 void mme_app_delete_s11_procedure_create_bearer(ue_context_t * const ue_context_p);
-void mme_app_s11_procedure_create_bearer_send_response(ue_context_t * const ue_context_p, mme_app_s11_proc_create_bearer_t* s11_proc_create);
+
+mme_app_s11_proc_delete_bearer_t* mme_app_create_s11_procedure_delete_bearer(ue_context_t * const ue_context_p);
+mme_app_s11_proc_delete_bearer_t* mme_app_get_s11_procedure_delete_bearer(ue_context_t * const ue_context_p);
+void mme_app_delete_s11_procedure_delete_bearer(ue_context_t * const ue_context_p);
 
 /*
  * - Creating handover procedure in intra-MME and inter-MME handover

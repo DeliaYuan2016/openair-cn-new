@@ -35,18 +35,26 @@
 int mme_app_notify_s1ap_ue_context_released(const mme_ue_s1ap_id_t   ue_idP);
 int mme_app_send_nas_signalling_connection_rel_ind(const mme_ue_s1ap_id_t ue_id);
 int mme_app_send_s11_release_access_bearers_req (struct ue_context_s *const ue_context);
-int mme_app_send_s11_create_session_req (  struct ue_context_s *const ue_context, const imsi_t const * imsi_p, pdn_context_t * pdn_context, tai_t * serving_tai);
+int mme_app_send_s11_create_session_req (  struct ue_context_s *const ue_context, const imsi_t const * imsi_p, pdn_context_t * pdn_context, tai_t * serving_tai, const bool is_from_s10_tau);
 int mme_app_send_s11_modify_bearer_req(struct ue_context_s *const ue_context, pdn_context_t * pdn_context);
 int mme_app_remove_s10_tunnel_endpoint(teid_t local_teid, struct in_addr peer_ip);
-int mme_app_send_delete_session_request (struct ue_context_s * const ue_context_p, const ebi_t ebi, const struct in_addr saegw_s11_in_addr, const teid_t saegw_s11_teid); /**< Moved Delete Session Request from mme_app_detach. */
+int mme_app_send_delete_session_request (struct ue_context_s * const ue_context_p, const ebi_t ebi, const struct in_addr saegw_s11_in_addr, const teid_t saegw_s11_teid, const bool noDelete); /**< Moved Delete Session Request from mme_app_detach. */
+
+void mme_app_itti_e_rab_failure(mme_ue_s1ap_id_t ue_id, ebi_t ebi);
 
 int
 mme_app_send_s11_create_bearer_rsp (
   struct ue_context_s *const ue_context,
-//  struct in_addr  peer_ip,
-  teid_t          saegw_s11_teid,
-  struct bearer_contexts_sucess_s *bearer_contexts_success,
-  struct bearer_contexts_sucess_s *bearer_contexts_failed);
+  pdn_context_t       *pdn_ctx,
+  void                *trxn,
+  bearer_contexts_to_be_created_t * bcs_tbc);
+
+int
+mme_app_send_s11_delete_bearer_rsp (
+  struct ue_context_s *const ue_context,
+  pdn_context_t       *pdn_ctx,
+  void                *trxn,
+  ebi_list_t          *ebi_list);
 
 void mme_app_itti_nas_context_response(ue_context_t * ue_context, nas_s10_context_t * s10_context_val);
 void mme_app_itti_nas_pdn_connectivity_response(ue_context_t * ue_context, paa_t *paa, protocol_configuration_options_t * pco, bearer_context_t * bc);

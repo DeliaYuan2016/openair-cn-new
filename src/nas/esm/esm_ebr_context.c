@@ -122,7 +122,7 @@ esm_ebr_context_create (
 
   OAILOG_FUNC_IN (LOG_NAS_ESM);
   esm_ctx = &emm_context->esm_ctx;
-  ue_context_t                        *ue_context  = mme_ue_context_exists_mme_ue_s1ap_id (&mme_app_desc.mme_ue_contexts, emm_context->ue_id);
+  ue_context_t                           *ue_context  = mme_ue_context_exists_mme_ue_s1ap_id (&mme_app_desc.mme_ue_contexts, emm_context->ue_id);
 
   if(!pdn_context){
     OAILOG_ERROR(LOG_NAS_ESM , "ESM-PROC  - PDN connection has not been " "allocated for UE " MME_UE_S1AP_ID_FMT". \n", emm_context->ue_id);
@@ -177,10 +177,16 @@ esm_ebr_context_create (
      */
 
     bearer_context->qci = bearer_level_qos->qci;
+
     bearer_context->esm_ebr_context.gbr_dl = bearer_level_qos->gbr.br_dl;
     bearer_context->esm_ebr_context.gbr_ul = bearer_level_qos->gbr.br_ul;
     bearer_context->esm_ebr_context.mbr_dl = bearer_level_qos->mbr.br_dl;
     bearer_context->esm_ebr_context.mbr_ul = bearer_level_qos->mbr.br_ul;
+
+    /** Set the priority values. */
+    bearer_context->preemption_capability    = bearer_level_qos->pci == 0 ? 1 : 0;
+    bearer_context->preemption_vulnerability = bearer_level_qos->pvi == 0 ? 1 : 0;
+    bearer_context->priority_level           = bearer_level_qos->pl;
 
     if (bearer_context->esm_ebr_context.tft) {
       free_traffic_flow_template(&bearer_context->esm_ebr_context.tft);
@@ -192,19 +198,14 @@ esm_ebr_context_create (
     }
     bearer_context->esm_ebr_context.pco = pco;
 
-    /*
-     * Set the FTEIDs.
-     * It looks ugly here, but we don't have the EBI in the MME_APP when S11 CBR is received, and need also don't have the ebi's there yet.
-     */
-
-    /** todo: For Attach --> Set FTEIDs and bearer state. */
-    //    Assert(!RB_INSERT (BearerFteids, &s11_proc_create_bearer->fteid_set, fteid_set)); /**< Find the correct FTEID later by using the S1U FTEID as key.. */
-//    memcpy((void*)&bearer_context->s_gw_fteid_s1u , &fteid_set->s1u_fteid, sizeof(fteid_t));
-//    memcpy((void*)&bearer_context->p_gw_fteid_s5_s8_up , &fteid_set->s5_fteid, sizeof(fteid_t));
-    // Todo: we cannot store them in a map, because when we evaluate the response, EBI is our key, which is not set here. That's why, we need to forward it to ESM.
-
+    /** We can set the FTEIDs right before the CBResp is set. */
+    if(fteid_set){
+      memcpy((void*)&bearer_context->s_gw_fteid_s1u , fteid_set->s1u_fteid, sizeof(fteid_t));
+      memcpy((void*)&bearer_context->p_gw_fteid_s5_s8_up , fteid_set->s5_fteid, sizeof(fteid_t));
+      bearer_context->bearer_state |= BEARER_STATE_SGW_CREATED;
+    }
     /** Set the MME_APP states (todo: may be with Activate Dedicated Bearer Response). */
-//    bearer_context->bearer_state   |= BEARER_STATE_SGW_CREATED;
+    bearer_context->bearer_state   |= BEARER_STATE_SGW_CREATED;
     bearer_context->bearer_state   |= BEARER_STATE_MME_CREATED;
 
     if (is_default) {
@@ -292,7 +293,7 @@ esm_ebr_context_release (
     OAILOG_FUNC_RETURN (LOG_NAS_ESM, RETURNerror);
   }
 
-  if(*pid != NULL){
+  if(*pid != NULL && *pid != MAX_APN_PER_UE){
     mme_app_get_pdn_context(ue_context, *pid, ebi, NULL, &pdn_context);
   }else{
     /** Get the bearer context from all session bearers. */

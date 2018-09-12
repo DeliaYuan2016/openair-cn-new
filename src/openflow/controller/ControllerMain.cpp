@@ -45,17 +45,18 @@ int start_of_controller(void) {
   static openflow::PacketInSwitchApplication packet_in_sw_app;
   static openflow::PagingApplication paging_app(packet_in_sw_app);
   static openflow::ArpApplication arp_app(packet_in_sw_app,
-      spgw_config.sgw_config.ovs_config.egress_port_num,
-      std::string(bdata(spgw_config.sgw_config.ovs_config.l2_egress_port)),
-      spgw_config.pgw_config.ipv4.SGI);
+      spgw_config.pgw_config.ovs_config.egress_port_num,
+      std::string(bdata(spgw_config.pgw_config.ovs_config.l2_egress_port)),
+      spgw_config.pgw_config.ipv4.SGI,
+      &spgw_config.pgw_config.ovs_config.sgi_arp_boot_cache);
   static openflow::BaseApplication base_app;
   static openflow::GTPApplication gtp_app(
-    std::string(bdata(spgw_config.sgw_config.ovs_config.uplink_mac)),
+    std::string(bdata(spgw_config.pgw_config.ovs_config.uplink_mac)),
     spgw_config.sgw_config.ipv4.S1u_S12_S4_up,
-    spgw_config.sgw_config.ovs_config.gtp_port_num,
+    spgw_config.pgw_config.ovs_config.gtp_port_num,
     spgw_config.pgw_config.ipv4.SGI,
-    std::string(bdata(spgw_config.sgw_config.ovs_config.l2_egress_port)),
-    spgw_config.sgw_config.ovs_config.egress_port_num
+    std::string(bdata(spgw_config.pgw_config.ovs_config.l2_egress_port)),
+    spgw_config.pgw_config.ovs_config.egress_port_num
   );
 
   // Base app registers first, because it deletes/creates default flow
@@ -66,6 +67,7 @@ int start_of_controller(void) {
   ctrl.register_for_event(&gtp_app, openflow::EVENT_SWITCH_UP);
   ctrl.register_for_event(&gtp_app, openflow::EVENT_ADD_GTP_TUNNEL);
   ctrl.register_for_event(&gtp_app, openflow::EVENT_DELETE_GTP_TUNNEL);
+  ctrl.register_for_event(&gtp_app, openflow::EVENT_STOP_DL_DATA_NOTIFICATION);
   ctrl.register_for_event(&arp_app, openflow::EVENT_SWITCH_UP);
 
   ctrl.start();
@@ -101,9 +103,15 @@ int openflow_controller_add_gtp_tunnel(struct in_addr ue, struct in_addr enb,
 }
 
 
-int openflow_controller_del_gtp_tunnel(struct in_addr ue, uint32_t i_tei, const pcc_rule_t *const rule) {
-  auto del_tunnel = std::make_shared<openflow::DeleteGTPTunnelEvent>(ue, i_tei, rule);
+int openflow_controller_del_gtp_tunnel(struct in_addr ue, uint32_t i_tei, uint32_t o_tei, const pcc_rule_t *const rule) {
+  auto del_tunnel = std::make_shared<openflow::DeleteGTPTunnelEvent>(ue, i_tei, o_tei, rule);
   ctrl.inject_external_event(del_tunnel, external_event_callback);
+  return 0;
+}
+
+int openflow_controller_stop_dl_data_notification_ue(struct in_addr ue, uint16_t timeout) {
+  auto stop_dl_not = std::make_shared<openflow::StopDLDataNotificationEvent>(ue, timeout);
+  ctrl.inject_external_event(stop_dl_not, external_event_callback);
   return 0;
 }
 

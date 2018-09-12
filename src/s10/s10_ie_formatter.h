@@ -60,7 +60,7 @@ s10_mm_ue_context_ie_get (
 nw_rc_t s10_pdn_connection_ie_set ( nw_gtpv2c_msg_handle_t * msg, void * arg);
 
 nw_rc_t
-s10_pdn_connection_ie_get ( uint8_t ieType, uint16_t ieLength, uint8_t ieInstance, uint8_t * ieValue, void *arg);
+s10_pdn_connections_ie_get ( uint8_t ieType, uint16_t ieLength, uint8_t ieInstance, uint8_t * ieValue, void *arg);
 
 /* F-Cause Information Element
  * 3GPP TS 29.274 #8.49
@@ -132,7 +132,7 @@ int s10_ebi_ie_set(nw_gtpv2c_msg_handle_t *msg, const unsigned ebi);
 /* Bearer Contexts to Create Information Element as part of Create Session Request
  * 3GPP TS 29.274 Table 7.2.1-2.
  */
-//nw_rc_t s10_bearer_context_to_be_created_ie_get (uint8_t ieType, uint8_t ieLength, uint8_t ieInstance, uint8_t * ieValue, void *arg);
+//nw_rc_t s10_bearer_context_to_be_created_ie_get (uint8_t ieType, uint16_t ieLength, uint8_t ieInstance, uint8_t * ieValue, void *arg);
 
 int s10_bearer_context_to_be_modified_ie_set (nw_gtpv2c_msg_handle_t * msg, const bearer_context_to_be_modified_t * bearer_context);
 
@@ -145,8 +145,6 @@ nw_rc_t s10_bearer_context_to_be_modified_ie_get(uint8_t ieType, uint16_t ieLeng
 int s10_ebi_ie_set(nw_gtpv2c_msg_handle_t *msg, const unsigned ebi);
 
 nw_rc_t s10_ebi_ie_get (uint8_t ieType, uint16_t ieLength, uint8_t ieInstance, uint8_t * ieValue, void *arg);
-
-nw_rc_t s10_ebi_ie_get_list (uint8_t ieType, uint16_t ieLength, uint8_t ieInstance, uint8_t * ieValue, void *arg);
 
 /** Set the Bearer Context IE. */
 int s10_bearer_context_to_create_ie_set (nw_gtpv2c_msg_handle_t * msg, const bearer_contexts_to_be_created_t * bearer_contexts);
@@ -235,6 +233,11 @@ s10_pdn_address_ie_set (
   NW_IN const struct in_addr  const * ipv4Addr);
 
 int
+s10_ipv4_address_ie_set (
+    nw_gtpv2c_msg_handle_t * msg,
+  NW_IN const struct in_addr  const * ipv4Addr);
+
+int
 s10_ipv6_address_ie_set (
     nw_gtpv2c_msg_handle_t * msg,
   NW_IN const struct in6_addr  const * ipv6Addr);
@@ -259,12 +262,6 @@ nw_rc_t s10_ue_time_zone_ie_get(
 
 int s10_ue_time_zone_ie_set(nw_gtpv2c_msg_handle_t *msg,
                             const UETimeZone_t *ue_time_zone);
-
-/* Target Identification Information Element
- * 3GPP TS 29.274 #8.51
- */
-nw_rc_t s10_target_identification_ie_get(
-  uint8_t ieType, uint16_t ieLength, uint8_t ieInstance, uint8_t *ieValue, void *arg);
 
 /* Bearer Flags Information Element
  * 3GPP TS 29.274 #8.32

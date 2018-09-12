@@ -62,6 +62,7 @@ function help()
   echo_error "Options:"
   echo_error "Mandatory arguments to long options are mandatory for short options too."
   echo_error "  -c, --config-file     file_abs_path Config file to be used by spgw if you don't want to use the default one: $g_spgw_default_config_file"
+  echo_error "  -d, --daemon                        Run spgw as a daemon."
   echo_error "  -g, --gdb                           Run with GDB."
   echo_error "  -G, --gdb-cmd         cmd cmd_arg   Append this GDB cmd to GDB command file (ex1: break Attach.c:272, ex2: watch 0xffee0002)."
   echo_error "                                      All repetitions of this argument are valid."
@@ -97,13 +98,15 @@ PIDFILE=/var/run/$NAME.pid
 function main()
 {
   local -i run_gdb=0
+  local -i run_daemon=0
   local -i set_network_interfaces=0
   local    exe_arguments=" "
   local    spgw_config_file=$g_spgw_default_config_file
   local    sgi_nh
   local    sgi_mac_nh
   local    breakpoint_location=""
-  local -a gdb_args
+  local -a gdb_args1
+  local -a gdb_args2
   local -i gdb_index=0
 
   until [ -z "$1" ]
@@ -114,6 +117,10 @@ function main()
         echo "setting config file to: $spgw_config_file"
         shift 2;
         ;;
+      -d | --daemon)
+        run_daemon=1
+        shift;
+        ;;
       -g | --gdb)
         run_gdb=1
         echo "setting GDB flag to: $run_gdb"
@@ -121,14 +128,15 @@ function main()
         ;;
       -G | --gdb-arg)
         run_gdb=1
-        gdb_args[$gdb_index]="$2 $3"
-        echo "Appending gdb args: ${gdb_args[$gdb_index]}"
+        gdb_args1[$gdb_index]="$2"
+        gdb_args2[$gdb_index]="$3"
+        echo "Appending gdb args: ${gdb_args1[$gdb_index]} ${gdb_args2[$gdb_index]}"
         gdb_index=$((gdb_index + 1))
         shift 3;
         ;;
       --gtpu)
         list_include_item "$LIBGTPNL $OPENFLOW $OPENFLOW_MOSAIC" $2
-        [[ $? -ne 0 ]] && echo_error "GTPV1U API type $2 not recognized or not available" && return $?
+        ret=$?;[[ $ret -ne 0 ]] && echo_error "GTPV1U API type $2 not recognized or not available" && return $ret
         GTPU_API=$2
         shift 2;
         ;;
@@ -210,13 +218,18 @@ function main()
   sgi_nw_device="`cat $spgw_config_file | cut -d "#" -f1 | grep $sgi_nw_dev_string | tr -d " " | grep "="`"
   eval $sgi_nw_device
   is_interface_up ${!sgi_nw_dev_string}
-  [[ $? -ne 0 ]] && echo_error "Failed to find SGi interface ${!sgi_nw_dev_string} up" && return $?
-  sgi_ip_cidr=$(get_interface_inet_global_cidr ${!sgi_nw_dev_string})
-  sgi_ip=$(echo $sgi_ip_cidr | cut -d '/' -f1)
-  echo_success "SGI interface ${!sgi_nw_dev_string} found up, inet $sgi_ip_cidr"
+  ret=$?;[[ $ret -ne 0 ]] && echo_error "Failed to find SGi interface ${!sgi_nw_dev_string} up" && return $ret
 
-  echo_info "Setting in $spgw_config_file PGW_IPV4_ADDRESS_FOR_SGI = $sgi_ip_cidr"
-  sed -i "s|.*PGW_IPV4_ADDRESS_FOR_SGI.*|        PGW_IPV4_ADDRESS_FOR_SGI = \"$sgi_ip_cidr\";|" $spgw_config_file
+  sgi_ip_cidr_string="PGW_IPV4_ADDRESS_FOR_SGI"
+  sgi_ip_cidr="`cat $spgw_config_file | cut -d "#" -f1 | grep $sgi_ip_cidr_string | tr -d " " | grep "="`"
+  eval $sgi_ip_cidr
+  #sgi_ip_cidr=$(get_interface_inet_global_cidr ${!sgi_nw_dev_string})
+  sgi_ip=$(echo $sgi_ip_cidr | cut -d '/' -f1)
+
+  echo_success "SGI interface ${!sgi_nw_dev_string} found inet ${!sgi_ip_cidr_string} in config file"
+
+  #echo_info "Setting in $spgw_config_file PGW_IPV4_ADDRESS_FOR_SGI = $sgi_ip_cidr"
+  #sed -i "s|.*PGW_IPV4_ADDRESS_FOR_SGI.*|        PGW_IPV4_ADDRESS_FOR_SGI = \"$sgi_ip_cidr\";|" $spgw_config_file
 
   ##########################
   # GTPV1-U INTERFACE
@@ -226,10 +239,10 @@ function main()
   s1u_nw_device="`cat $spgw_config_file | cut -d "#" -f1 | grep $s1u_nw_dev_string | tr -d " " | grep "="`"
   eval $s1u_nw_device
   is_interface_up ${!s1u_nw_dev_string}
-  [[ $? -ne 0 ]] && echo_error "Failed to find S1-U interface up" && return $?
+  ret=$?;[[ $ret -ne 0 ]] && echo_error "Failed to find S1-U interface up" && return $ret
   s1u_ip_cidr=$(get_interface_inet_global_cidr ${!s1u_nw_dev_string})
   s1u_ip=$(echo $s1u_ip_cidr | cut -d '/' -f1)
-  echo_success "S1-U interface ${!s1u_nw_dev_string} found up, inet $s1u_ip_cidr"
+  echo_success "S1-U interface ${!s1u_nw_dev_string} found inet $s1u_ip_cidr in config file"
 
   echo_info "Setting in $spgw_config_file SGW_IPV4_ADDRESS_FOR_S1U_S12_S4_UP = $s1u_ip_cidr"
   sed -i "s|.*SGW_IPV4_ADDRESS_FOR_S1U_S12_S4_UP.*|        SGW_IPV4_ADDRESS_FOR_S1U_S12_S4_UP = \"$s1u_ip_cidr\";|" $spgw_config_file
@@ -237,9 +250,16 @@ function main()
 
   if [ -z ${ENABLE_OPENFLOW+x} ]  ||  [ -z ${ENABLE_OPENFLOW_MOSAIC+x} ]; then
     ovs_start
+    ret=$?;[[ $ret -ne 0 ]] && echo_error "Failed to start OVS" && return $ret
+
+    sleep 1
+    $SUDO ovs-vsctl del-br $OVS_GTPU_BRIDGE_NAME
     sleep 1
 
     if [ -z $sgi_mac_nh ]; then
+    
+      $SUDO ifconfig ${!sgi_nw_dev_string} ${!sgi_ip_cidr_string}
+      
       if [ -z $sgi_nh ]; then
         subnet=$(ip address show dev ${!sgi_nw_dev_string} | grep inet | grep -v inet6 | xargs | cut -d ' ' -f2 | cut -d '/' -f1 | cut -d '.' -f1-3)
         [[ $? -ne 0 ]] && echo_error "Failed to get subnet of SGi interface" && return $?
@@ -251,10 +271,13 @@ function main()
       ping -I ${!sgi_nw_dev_string} -c 1 $sgi_nh
       # May be configured to not reply to ping
       # Assume default route is through SGi
-      [[ $? -ne 0 ]] && ping -I ${!sgi_nw_dev_string} -c 1 www.google.com
-      [[ $? -ne 0 ]] && echo_error "Failed to ping google server after failed to ping SGI next hop" && return $?
+      ret=$?
+      if [[ $ret -ne 0 ]]; then 
+        ping -I ${!sgi_nw_dev_string} -c 1 www.google.com
+        ret=$?;[[ $ret -ne 0 ]] && echo_error "Failed to ping google server after failed to ping SGI next hop" && return $ret
+      fi
       sgi_mac_nh=$(arp --device ${!sgi_nw_dev_string} --numeric | grep $sgi_nh | xargs | cut -d ' ' -f3)
-      [[ $? -ne 0 ]] && echo_error "Failed to get L2 address of SGi next hop" && return $?
+      ret=$?;[[ $ret -ne 0 ]] && echo_error "Failed to get L2 address of SGi next hop" && return $ret
     fi
     echo "Set SGi next hop L2 address to $sgi_mac_nh"
 
@@ -262,39 +285,37 @@ function main()
     ##########################
     # Bridge configuration
     ##########################
-    $SUDO ovs-vsctl del-br $OVS_GTPU_BRIDGE_NAME
-    sleep 1
     #$SUDO ovs-vsctl add-br $OVS_GTPU_BRIDGE_NAME -- set bridge $OVS_GTPU_BRIDGE_NAME protocols=OpenFlow10,OpenFlow13 
     $SUDO ovs-vsctl add-br $OVS_GTPU_BRIDGE_NAME
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && echo_error "Could not create OVS switch $OVS_GTPU_BRIDGE_NAME" && return $ret
     echo_success "Created switch $OVS_GTPU_BRIDGE_NAME"
     sleep 1
     
     echo "Add port ${!sgi_nw_dev_string} to $OVS_GTPU_BRIDGE_NAME"
     $SUDO ovs-vsctl add-port $OVS_GTPU_BRIDGE_NAME ${!sgi_nw_dev_string}
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
     sleep 1
     
     echo "Add port s1u to $OVS_GTPU_BRIDGE_NAME"
     $SUDO ovs-vsctl add-port $OVS_GTPU_BRIDGE_NAME s1u -- set Interface s1u type=gtp options:remote_ip=flow -- set Interface s1u type=gtp options:key=flow
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
     
     echo "ifconfig $OVS_GTPU_BRIDGE_NAME up"
     $SUDO ifconfig $OVS_GTPU_BRIDGE_NAME up
-    #[[ $? -ne 0 ]] && return $?
+    #ret=$?;[[ $ret -ne 0 ]] && return $ret
     sleep 1
     
     echo "ifconfig  ${!sgi_nw_dev_string} 0"
     $SUDO ifconfig  ${!sgi_nw_dev_string} 0
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
     sleep 1
 
-    echo "ip addr add $sgi_ip dev $OVS_GTPU_BRIDGE_NAME"
-    $SUDO ip addr add $sgi_ip dev $OVS_GTPU_BRIDGE_NAME 
-    [[ $? -ne 0 ]] && return $?
+    echo "ip addr add ${!sgi_ip_cidr_string} dev $OVS_GTPU_BRIDGE_NAME"
+    $SUDO ip addr add ${!sgi_ip_cidr_string} dev $OVS_GTPU_BRIDGE_NAME 
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
     
     $SUDO ovs-vsctl set-controller $OVS_GTPU_BRIDGE_NAME  tcp:$CTRL_IP:$CTRL_PORT
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
 
 
     # Port for GTPV1-U network device
@@ -323,26 +344,48 @@ function main()
 
   exe_arguments="-c $spgw_config_file $exe_arguments"
 
-  if [ $run_gdb -eq 0 ]; then 
-    # trap keyboard interrupt (control-c)
-    trap control_c SIGINT
-    $SUDO spgw  `echo $exe_arguments` 2>&1 
+  if [ $run_daemon -eq 1 ]; then 
+    $SUDO daemon --name=upnf --stdout=/tmp/spgwd_stdout.log --stderr=/tmp/spgwd_stderr.log --pidfile=/tmp/spgwd.pid -X /usr/local/bin/spgw
+    ret=$?
+    [[ $ret -ne 0 ]] && return $ret
+    if [ $run_gdb -ne 0 ]; then 
+      # trap keyboard interrupt (control-c) is done by gdb
+      $SUDO touch      .gdb_spgwd
+      $SUDO chmod 777  .gdb_spgwd
+      
+      $SUDO echo "set target-async on" > .gdb_spgwd
+      $SUDO echo "set pagination off" >> .gdb_spgwd
+      spgwd_pid=`pidof spgw`
+      $SUDO echo "attach $spgwd_pid"  >> .gdb_spgwd
+      for i in ${!gdb_args1[@]}; do
+        $SUDO echo "${gdb_args1[i]} ${gdb_args2[i]}" >> .gdb_spgwd
+      done
+      $SUDO echo "continue"    >> .gdb_spgwd
+      $SUDO cat .gdb_spgwd
+      $SUDO gdb -n -x .gdb_spgwd
+    fi
   else
-    # trap keyboard interrupt (control-c) is done by gdb
-    $SUDO touch      ~/.gdb_spgw
-    $SUDO chmod 777  ~/.gdb_spgw
-    $SUDO echo "file spgw" > ~/.gdb_spgw
-    $SUDO echo "set args $exe_arguments "        >> ~/.gdb_spgw
-    for i in ${gdb_args[@]}; do
-      $SUDO echo "$i"                            >> ~/.gdb_mme
-    done
-    $SUDO echo "run"                             >> ~/.gdb_spgw
-    $SUDO cat ~/.gdb_spgw
-    $SUDO gdb -n -x ~/.gdb_spgw
-    if [ $g_run_msc_gen -eq 1 ]; then 
-      #$SUDO do_msc_gen
-      cd $g_msc_dir
-      $SUDO $THIS_SCRIPT_PATH/msc_gen --profile EPC --dir $g_msc_dir --type png
+    if [ $run_gdb -eq 0 ]; then 
+      # trap keyboard interrupt (control-c)
+      trap control_c SIGINT
+      $SUDO spgw  `echo $exe_arguments` 2>&1 
+    else
+      # trap keyboard interrupt (control-c) is done by gdb
+      $SUDO touch      ~/.gdb_spgw
+      $SUDO chmod 777  ~/.gdb_spgw
+      $SUDO echo "file spgw" > ~/.gdb_spgw
+      $SUDO echo "set args $exe_arguments "        >> ~/.gdb_spgw
+      for i in ${!gdb_args1[@]}; do
+        $SUDO echo "${gdb_args1[i]} ${gdb_args2[i]}" >> .gdb_spgw
+      done
+      $SUDO echo "run"                             >> ~/.gdb_spgw
+      $SUDO cat ~/.gdb_spgw
+      $SUDO gdb -n -x ~/.gdb_spgw
+      if [ $g_run_msc_gen -eq 1 ]; then 
+        #$SUDO do_msc_gen
+        cd $g_msc_dir
+        $SUDO $THIS_SCRIPT_PATH/msc_gen --profile EPC --dir $g_msc_dir --type png
+      fi
     fi
   fi
   return $?

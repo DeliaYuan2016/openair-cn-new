@@ -162,7 +162,7 @@ install_1.1.5_freediameter_from_source() {
     python-dev \
     ssl-cert \
     swig
-  [[ $? -ne 0 ]] && return $?
+  ret=$?;[[ $ret -ne 0 ]] && return $ret
 
   if [[ $prompt =~ [yY](es)* ]]
   then
@@ -170,20 +170,21 @@ install_1.1.5_freediameter_from_source() {
     echo "Downloading 1.1.5 freeDiameter archive"
     $SUDO rm -rf /tmp/1.1.5.tar.gz /tmp/freeDiameter-1.1.5 /tmp/freediameter
     GIT_SSL_NO_VERIFY=true git clone https://gitlab.eurecom.fr/oai/freediameter.git -b eurecom-1.1.5
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
     cd /tmp/freediameter
     #patch -p1 < $OPENAIRCN_DIR/src/s6a/freediameter/freediameter-1.1.5.patch
+    patch -p1 < $OPENAIRCN_DIR/src/s6a/freediameter/freediameter_eurecom-1.1.5_0001-S6a-dictionary-add-CLR-Flags.patch
     mkdir build
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
     cd build
     cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr ../
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
     echo "Compiling freeDiameter"
     make -j`nproc`
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
     #make test
     $SUDO make install
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
     cd /tmp
     rm -rf /tmp/1.1.5.tar.gz /tmp/freeDiameter-1.1.5 /tmp/freediameter
   fi
@@ -201,8 +202,17 @@ install_freediameter_from_source() {
     OPTION="-y"
   fi
   if [[ "$OS_DISTRO" == "ubuntu" ]]; then
+    case "$(get_distribution_release)" in
+	"ubuntu17.04" | "ubuntu17.10" | "ubuntu18.04")
+	    specific_packages="libgnutls28-dev"
+	    ;;
+	"ubuntu14.04" | "ubuntu16.04")
+	    specific_packages="libgnutls-dev"
+	    ;;
+    esac
     # libpq-dev 'may' be not needed
     PACKAGE_LIST="\
+      $specific_packages \
       autoconf \
       automake \
       bison \
@@ -215,7 +225,6 @@ install_freediameter_from_source() {
       gcc \
       gdb \
       libgcrypt-dev \
-      libgnutls-dev \
       libidn11-dev \
       libmysqlclient-dev \
       libpq-dev \
@@ -259,15 +268,16 @@ install_freediameter_from_source() {
     #tar xzf 1.2.0.tar.gz
     cd freediameter
     #patch -p1 < $OPENAIRCN_DIR/src/s6a/freediameter/freediameter-1.2.0.patch
+    patch -p1 < $OPENAIRCN_DIR/src/s6a/freediameter/freediameter_eurecom-1.2.0_0001-S6a-dictionary-add-CLR-Flags.patch
     mkdir build
     cd build
     $CMAKE -DCMAKE_INSTALL_PREFIX:PATH=/usr/local ../
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
     make -j`nproc`
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
     #make test
     $SUDO make install
-    [[ $? -ne 0 ]] && return $?
+    ret=$?;[[ $ret -ne 0 ]] && return $ret
     cd /tmp
     rm -rf /tmp/1.2.0.tar.gz /tmp/freeDiameter-1.2.0 /tmp/freediameter
   fi
@@ -327,5 +337,72 @@ install_latest_freediameter_from_source() {
     $SUDO make install
     cd /tmp
     rm -rf /tmp/freediameter
+  fi
+}
+
+#-------------------------------------------------------------------------------
+# arg1 is force (no interactive script)
+install_opencoord.org_freediameter() {
+  if [ $1 -eq 0 ]; then
+    read -p "Do you want to install opencoord freeDiameter ? <y/N> " prompt
+    OPTION=""
+  else
+    prompt='y'
+    OPTION="-y"
+  fi
+
+  # libpq-dev 'may' be not needed
+  $SUDO apt-get install $OPTION \
+    autoconf  \
+    automake  \
+    bison     \
+    build-essential \
+    cmake \
+    cmake-curses-gui  \
+    debhelper \
+    flex  \
+    g++ \
+    gcc \
+    gdb \
+    libgcrypt-dev \
+    libidn11-dev \
+    libmysqlclient-dev \
+    libpq-dev \
+    libsctp1 \
+    libsctp-dev \
+    libxml2-dev \
+    mercurial \
+    python-dev \
+    ssl-cert \
+    swig
+
+  if [[ $prompt =~ [yY](es)* ]]
+  then
+    pushd `pwd`
+    cd /tmp
+    rm -rf /tmp/freeDiameter
+    echo "Downloading opencoord.org freeDiameter "
+    git clone https://gerrit.opencord.org/freeDiameter.git
+    res=$?
+    [[ $res -ne 0 ]] && popd && return $res
+    cd freeDiameter
+    git apply $OPENAIRCN_DIR/build/patches/0001-opencoord.org.freeDiameter.patch
+    rm -rf build
+    mkdir -p build
+    cd build
+    $CMAKE ..
+    res=$?
+    [[ $res -ne 0 ]] && popd && return $res
+    awk '{if (/^DISABLE_SCTP/) gsub(/OFF/, "ON"); print}' CMakeCache.txt > tmp && mv tmp CMakeCache.txt
+    make -j`nproc`
+    res=$?
+    [[ $res -ne 0 ]] && popd && return $res
+    $SUDO make install
+    res=$?
+    [[ $res -ne 0 ]] && popd && return $res
+    cd /tmp
+    rm -rf /tmp/freediameter
+    popd     
+    return $?
   fi
 }

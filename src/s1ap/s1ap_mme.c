@@ -125,6 +125,9 @@ s1ap_mme_thread (
     switch (ITTI_MSG_ID (received_message_p)) {
     case ACTIVATE_MESSAGE:{
         hss_associated = true;
+        if (s1ap_send_init_sctp () < 0) {
+          OAILOG_CRITICAL (LOG_S1AP, "Error while sending SCTP_INIT_MSG to SCTP\n");
+        }
       }
       break;
 
@@ -155,6 +158,11 @@ s1ap_mme_thread (
 
     case S1AP_E_RAB_SETUP_REQ:{
         s1ap_generate_s1ap_e_rab_setup_req (&S1AP_E_RAB_SETUP_REQ (received_message_p));
+      }
+      break;
+
+    case S1AP_E_RAB_RELEASE_REQ:{
+        s1ap_generate_s1ap_e_rab_release_req (&S1AP_E_RAB_RELEASE_REQ (received_message_p));
       }
       break;
 
@@ -260,9 +268,11 @@ s1ap_mme_thread (
         if (received_message_p->ittiMsg.timer_has_expired.arg != NULL) {
           ue_description_t* ue_ref_p = (ue_description_t *)(received_message_p->ittiMsg.timer_has_expired.arg);
           if (!ue_ref_p) {
-            OAILOG_WARNING (LOG_S1AP, "Timer expired but no associated UE context!\n");
+            OAILOG_WARNING (LOG_S1AP, "Timer with id 0x%lx expired but no associated UE context!\n", received_message_p->ittiMsg.timer_has_expired.timer_id);
             break;
           }
+          OAILOG_WARNING (LOG_S1AP, "Processing expired timer with id 0x%lx for ueId "MME_UE_S1AP_ID_FMT " with s1ap_ue_context_rel_timer_id 0x%lx !\n", received_message_p->ittiMsg.timer_has_expired.timer_id,
+              ue_ref_p->mme_ue_s1ap_id, ue_ref_p->s1ap_ue_context_rel_timer.id);
           if (received_message_p->ittiMsg.timer_has_expired.timer_id == ue_ref_p->s1ap_ue_context_rel_timer.id) {
             // UE context release complete timer expiry handler
             s1ap_mme_handle_ue_context_rel_comp_timer_expiry (ue_ref_p);
@@ -342,12 +352,7 @@ s1ap_mme_init(void)
     return RETURNerror;
   }
 
-  if (s1ap_send_init_sctp () < 0) {
-    OAILOG_ERROR (LOG_S1AP, "Error while sendind SCTP_INIT_MSG to SCTP \n");
-    return RETURNerror;
-  }
-
-  OAILOG_DEBUG (LOG_S1AP, "Initializing S1AP interface: DONE\n");
+  OAILOG_DEBUG (LOG_S1AP, "Initializing S1AP interface: DONE, but not reachable yet (wait for MME<->HSS CER procedure)\n");
   return RETURNok;
 }
 //------------------------------------------------------------------------------

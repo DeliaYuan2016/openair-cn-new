@@ -136,8 +136,6 @@ typedef struct emm_data_context_s {
   uint8_t                    attach_type;  /* EPS/Combined/etc. */
   additional_update_type_t   additional_update_type;
 
-//  uint             num_attach_request;/* Num attach request received               */
-
   emm_procedures_t  *emm_procedures;
 
   uint32_t         member_present_mask; /* bitmask, see significance of bits below */
@@ -203,13 +201,12 @@ typedef struct emm_data_context_s {
                                                         security context does not contain an EPS AS security context. A non-current EPS security context is either of type 'full
                                                         native' or of type 'partial native'.     */
 
-  int                      emm_cause;    /* EMM failure cause code                          */
+  int                      emm_cause;                /* EMM failure cause code                          */
 
   emm_fsm_state_t          _emm_fsm_state;
 
 
   struct esm_context_s     esm_ctx;
-
 
 //  ue_network_capability_t  tau_ue_network_capability;         /* stored TAU Request IE Requirement MME24.301R10_5.5.3.2.4_4*/
 //  ms_network_capability_t  tau_ms_network_capability;         /* stored TAU Request IE Requirement MME24.301R10_5.5.3.2.4_4*/
@@ -370,6 +367,11 @@ emm_data_context_remove (
  * Used for handover.
  */
 int emm_data_context_update_security_parameters(const mme_ue_s1ap_id_t ue_id,
+    uint16_t *encryption_algorithm_capabilities,
+    uint16_t *integrity_algorithm_capabilities);
+
+int mm_ue_eps_context_update_security_parameters(const mme_ue_s1ap_id_t ue_id,
+    mm_context_eps_t *mm_eps_ue_context,
     uint16_t *encryption_algorithm_capabilities,
     uint16_t *integrity_algorithm_capabilities);
 

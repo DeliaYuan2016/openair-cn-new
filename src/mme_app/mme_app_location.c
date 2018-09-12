@@ -110,7 +110,9 @@ int mme_app_handle_s6a_update_location_ans (
   MessageDef                             *message_p = NULL;
   itti_nas_pdn_config_rsp_t              *nas_pdn_config_rsp = NULL;
   uint64_t                                imsi64 = 0;
-  struct ue_context_s                    *ue_context = NULL;
+  struct ue_context_s                    *ue_context  = NULL;
+  struct emm_data_context_s              *emm_context = NULL;
+  struct apn_configuration_s             *apn_config  = NULL;
   int                                     rc = RETURNok;
 
   DevAssert (ula_pP );
@@ -122,6 +124,19 @@ int mme_app_handle_s6a_update_location_ans (
     OAILOG_ERROR (LOG_MME_APP, "That's embarrassing as we don't know this IMSI\n");
     MSC_LOG_EVENT (MSC_MMEAPP_MME, "0 S6A_UPDATE_LOCATION unknown imsi " IMSI_64_FMT" ", imsi64);
     OAILOG_FUNC_RETURN (LOG_MME_APP, RETURNerror);
+  }
+
+  /** Recheck that the EMM Data Context is found by the IMSI. */
+  if ((emm_context = emm_data_context_get_by_imsi(&_emm_data, imsi64)) == NULL) {
+    OAILOG_ERROR (LOG_MME_APP, "That's embarrassing as we don't know this IMSI " IMSI_64_FMT " for the EMM Data Context. \n", imsi64);
+    OAILOG_FUNC_RETURN (LOG_MME_APP, RETURNerror);
+  }
+
+  /** Send the S6a message. */
+  message_p = itti_alloc_new_message (TASK_MME_APP, NAS_PDN_CONFIG_RSP);
+
+  if (message_p == NULL) {
+    goto err;
   }
 
   if (ula_pP->result.present == S6A_RESULT_BASE) {
@@ -158,9 +173,13 @@ int mme_app_handle_s6a_update_location_ans (
   ue_context->network_access_mode = ula_pP->subscription_data.access_mode;
   memcpy (&ue_context->apn_config_profile, &ula_pP->subscription_data.apn_config_profile, sizeof (apn_config_profile_t));
 
+  /*
+   * Check that the all the established PDN Context exists (handover).
+   * todo: detach the PDNs which don't have a subscription.
+   */
   pdn_context_t * first_pdn = RB_MIN(PdnContexts, &ue_context->pdn_contexts);
   if(first_pdn){
-    struct apn_configuration_s* apn_config = mme_app_select_apn(ue_context, first_pdn->apn_subscribed);
+    apn_config = mme_app_select_apn(ue_context, first_pdn->apn_subscribed);
     DevAssert(apn_config);
   }
 
@@ -174,13 +193,6 @@ int mme_app_handle_s6a_update_location_ans (
   ue_context->implicit_detach_timer.id = MME_APP_TIMER_INACTIVE_ID;
   ue_context->implicit_detach_timer.sec = (ue_context->mobile_reachability_timer.sec) + MME_APP_DELTA_REACHABILITY_IMPLICIT_DETACH_TIMER * 60;
 
-
-  /** Send the S6a message. */
-  message_p = itti_alloc_new_message (TASK_MME_APP, NAS_PDN_CONFIG_RSP);
-
-  if (message_p == NULL) {
-    goto err;
-  }
 
   nas_pdn_config_rsp = &message_p->ittiMsg.nas_pdn_config_rsp;
   nas_pdn_config_rsp->ue_id  = ue_context->mme_ue_s1ap_id;
@@ -203,8 +215,7 @@ err:
   }
 
   itti_nas_pdn_config_fail_t *nas_pdn_config_fail = &message_p->ittiMsg.nas_pdn_config_fail;
-  nas_pdn_config_rsp->ue_id  = ue_context->mme_ue_s1ap_id;
-  nas_pdn_config_rsp->imsi64 = imsi64;
+  nas_pdn_config_fail->ue_id  = ue_context->mme_ue_s1ap_id;
 
   /** For error codes, use nas_pdn_cfg_fail. */
   MSC_LOG_TX_MESSAGE (MSC_MMEAPP_MME, MSC_NAS_MME, NULL, 0, "0 NAS_PDN_CONFIG_FAIL IMSI " IMSI_64_FMT, imsi64);

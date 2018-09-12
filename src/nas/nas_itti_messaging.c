@@ -98,29 +98,45 @@ nas_itti_erab_setup_req (const mme_ue_s1ap_id_t ue_id,
 }
 
 //------------------------------------------------------------------------------
-void nas_itti_dedicated_eps_bearer_complete(
+int
+nas_itti_erab_release_req (const mme_ue_s1ap_id_t ue_id,
+    const ebi_t ebi,
+    bstring                nas_msg)
+{
+  MessageDef  *message_p = itti_alloc_new_message (TASK_NAS_MME, NAS_ERAB_RELEASE_REQ);
+  NAS_ERAB_RELEASE_REQ (message_p).ue_id   = ue_id;
+  NAS_ERAB_RELEASE_REQ (message_p).ebi     = ebi;
+  NAS_ERAB_RELEASE_REQ (message_p).nas_msg = nas_msg;
+  nas_msg = NULL;
+  MSC_LOG_TX_MESSAGE (MSC_NAS_MME, MSC_MMEAPP_MME, NULL, 0, "0 NAS_ERAB_RELEASE_REQ ue id " MME_UE_S1AP_ID_FMT " ebi %u len %u", ue_id, ebi, blength(NAS_ERAB_SETUP_REQ (message_p).nas_msg));
+  // make a long way by MME_APP instead of S1AP to retrieve the sctp_association_id key.
+  return itti_send_msg_to_task (TASK_MME_APP, INSTANCE_DEFAULT, message_p);
+}
+
+//------------------------------------------------------------------------------
+void nas_itti_activate_bearer_cnf(
     const mme_ue_s1ap_id_t ue_idP,
-    const ebi_t ebiP)
+    const ebi_t            ebi)
 {
   OAILOG_FUNC_IN(LOG_NAS);
-  MessageDef  *message_p = itti_alloc_new_message (TASK_NAS_MME, MME_APP_CREATE_DEDICATED_BEARER_RSP);
-  MME_APP_CREATE_DEDICATED_BEARER_RSP (message_p).ue_id   = ue_idP;
-  MME_APP_CREATE_DEDICATED_BEARER_RSP (message_p).ebi     = ebiP;
-  MSC_LOG_TX_MESSAGE (MSC_NAS_MME, MSC_MMEAPP_MME, NULL, 0, "0 MME_APP_CREATE_DEDICATED_BEARER_RSP ue id " MME_UE_S1AP_ID_FMT " ebi %u", ue_idP, ebiP);
+  MessageDef  *message_p = itti_alloc_new_message (TASK_NAS_MME, MME_APP_ACTIVATE_BEARER_CNF);
+  MME_APP_ACTIVATE_BEARER_CNF (message_p).ue_id   = ue_idP;
+  MME_APP_ACTIVATE_BEARER_CNF (message_p).ebi     = ebi;
+  MSC_LOG_TX_MESSAGE (MSC_NAS_MME, MSC_MMEAPP_MME, NULL, 0, "0 MME_APP_ACTIVATE_BEARER_CNF ue id " MME_UE_S1AP_ID_FMT, ue_idP);
   itti_send_msg_to_task (TASK_MME_APP, INSTANCE_DEFAULT, message_p);
   OAILOG_FUNC_OUT(LOG_NAS);
 }
 
 //------------------------------------------------------------------------------
-void nas_itti_dedicated_eps_bearer_reject(
+void nas_itti_activate_bearer_rej(
     const mme_ue_s1ap_id_t ue_idP,
-    const ebi_t ebiP)
+    const ebi_t            ebi)
 {
   OAILOG_FUNC_IN(LOG_NAS);
-  MessageDef  *message_p = itti_alloc_new_message (TASK_NAS_MME, MME_APP_CREATE_DEDICATED_BEARER_REJ);
-  MME_APP_CREATE_DEDICATED_BEARER_REJ (message_p).ue_id   = ue_idP;
-  MME_APP_CREATE_DEDICATED_BEARER_REJ (message_p).ebi     = ebiP;
-  MSC_LOG_TX_MESSAGE (MSC_NAS_MME, MSC_MMEAPP_MME, NULL, 0, "0 MME_APP_CREATE_DEDICATED_BEARER_REJ ue id " MME_UE_S1AP_ID_FMT " ebi %u", ue_idP, ebiP);
+  MessageDef  *message_p = itti_alloc_new_message (TASK_NAS_MME, MME_APP_ACTIVATE_BEARER_REJ);
+  MME_APP_ACTIVATE_BEARER_REJ (message_p).ue_id   = ue_idP;
+  MME_APP_ACTIVATE_BEARER_REJ (message_p).ebi     = ebi;
+  MSC_LOG_TX_MESSAGE (MSC_NAS_MME, MSC_MMEAPP_MME, NULL, 0, "0 MME_APP_ACTIVATE_BEARER_REJ ue id " MME_UE_S1AP_ID_FMT, ue_idP);
   itti_send_msg_to_task (TASK_MME_APP, INSTANCE_DEFAULT, message_p);
   OAILOG_FUNC_OUT(LOG_NAS);
 }
@@ -133,29 +149,15 @@ void nas_itti_dedicated_eps_bearer_deactivation_complete(
     const ebi_t ded_ebi)
 {
   OAILOG_FUNC_IN(LOG_NAS);
-  MessageDef  *message_p = itti_alloc_new_message (TASK_NAS_MME, MME_APP_DELETE_DEDICATED_BEARER_RSP);
-  MME_APP_DELETE_DEDICATED_BEARER_RSP (message_p).ue_id     = ue_idP;
-  MME_APP_DELETE_DEDICATED_BEARER_RSP (message_p).def_ebi   = default_ebi;
-  MME_APP_DELETE_DEDICATED_BEARER_RSP (message_p).ded_ebi   = ded_ebi;
-  MME_APP_DELETE_DEDICATED_BEARER_RSP (message_p).pid       = pid;
-  MSC_LOG_TX_MESSAGE (MSC_NAS_MME, MSC_MMEAPP_MME, NULL, 0, "0 MME_APP_DELETE_DEDICATED_BEARER_RSP ue id " MME_UE_S1AP_ID_FMT " ebi %u", ue_idP, ded_ebi);
+  MessageDef  *message_p = itti_alloc_new_message (TASK_NAS_MME, MME_APP_DEACTIVATE_BEARER_CNF);
+  MME_APP_DEACTIVATE_BEARER_CNF (message_p).ue_id     = ue_idP;
+  MME_APP_DEACTIVATE_BEARER_CNF (message_p).def_ebi   = default_ebi;
+  MME_APP_DEACTIVATE_BEARER_CNF (message_p).ded_ebi   = ded_ebi;
+  MME_APP_DEACTIVATE_BEARER_CNF (message_p).pid       = pid;
+  MSC_LOG_TX_MESSAGE (MSC_NAS_MME, MSC_MMEAPP_MME, NULL, 0, "0 MME_APP_DEACTIVATE_BEARER_CNF ue id " MME_UE_S1AP_ID_FMT " ebi %u", ue_idP, ded_ebi);
   itti_send_msg_to_task (TASK_MME_APP, INSTANCE_DEFAULT, message_p);
   OAILOG_FUNC_OUT(LOG_NAS);
 }
-//
-////------------------------------------------------------------------------------
-//void nas_itti_dedicated_eps_bearer_reject(
-//    const mme_ue_s1ap_id_t ue_idP,
-//    const ebi_t ebiP)
-//{
-//  OAILOG_FUNC_IN(LOG_NAS);
-//  MessageDef  *message_p = itti_alloc_new_message (TASK_NAS_MME, MME_APP_CREATE_DEDICATED_BEARER_REJ);
-//  MME_APP_CREATE_DEDICATED_BEARER_REJ (message_p).ue_id   = ue_idP;
-//  MME_APP_CREATE_DEDICATED_BEARER_REJ (message_p).ebi     = ebiP;
-//  MSC_LOG_TX_MESSAGE (MSC_NAS_MME, MSC_MMEAPP_MME, NULL, 0, "0 MME_APP_CREATE_DEDICATED_BEARER_REJ ue id " MME_UE_S1AP_ID_FMT " ebi %u", ue_idP, ebiP);
-//  itti_send_msg_to_task (TASK_MME_APP, INSTANCE_DEFAULT, message_p);
-//  OAILOG_FUNC_OUT(LOG_NAS);
-//}
 
 //------------------------------------------------------------------------------
 void nas_itti_pdn_config_req(
@@ -299,6 +301,7 @@ void nas_itti_pdn_disconnect_req(
   ebi_t                   default_ebi,
   struct in_addr          saegw_s11_addr, /**< Put them into the UE context ? */
   teid_t                  saegw_teid,
+  bool                    noDelete,
   esm_proc_data_t        *proc_data_pP)
 {
   OAILOG_FUNC_IN(LOG_NAS);
@@ -313,6 +316,7 @@ void nas_itti_pdn_disconnect_req(
   NAS_PDN_DISCONNECT_REQ(message_p).pti             = proc_data_pP->pti;
   NAS_PDN_DISCONNECT_REQ(message_p).default_ebi     = default_ebi;
   NAS_PDN_DISCONNECT_REQ(message_p).ue_id           = ue_idP;
+  NAS_PDN_DISCONNECT_REQ(message_p).noDelete        = noDelete;
 
   NAS_PDN_DISCONNECT_REQ(message_p).saegw_s11_ip_addr    = saegw_s11_addr;
   NAS_PDN_DISCONNECT_REQ(message_p).saegw_s11_teid       = saegw_teid;
@@ -506,6 +510,18 @@ void nas_itti_establish_cnf(
     OAILOG_WARNING( LOG_NAS_EMM, "EMM-PROC  - NH value is NOT 0 @ initial S1AP context establishment  \n");
   }
 
+  OAILOG_STREAM_HEX(OAILOG_LEVEL_DEBUG, LOG_NAS, "New NH_CONJ of emmCtx: ", emm_ctx->_vector[emm_ctx->_security.vector_index].nh_conj, 32);
+
+
+  /** Reset the next chaining hop counter.
+   * TS. 33.401:
+   * Upon receipt of the NAS Service Request message, the MME shall derive key KeNB as specified in Annex A.3 using the
+    NAS COUNT [9] corresponding to the NAS Service Request and initialize the value of the Next hop Chaining Counter
+    (NCC) to one. The MME shall further derive a next hop parameter NH as specified in Annex A.4 using the newly
+    derived KeNB as basis for the derivation. This fresh {NH, NCC=1} pair shall be stored in the MME and shall be used for
+    the next forward security key derivation. The MME shall communicate the {KeNB, NCC=0} pair and KSIASME to the
+    serving eNB in the S1-AP procedure INITIAL CONTEXT SETUP.
+   */
   emm_ctx->_security.ncc = 0;
 
   MSC_LOG_TX_MESSAGE(
@@ -521,20 +537,22 @@ void nas_itti_establish_cnf(
 }
 
 //------------------------------------------------------------------------------
-void nas_itti_detach_req(const mme_ue_s1ap_id_t ue_idP)
+void nas_itti_detach_req(const mme_ue_s1ap_id_t ue_id)
 {
   OAILOG_FUNC_IN(LOG_NAS);
   MessageDef *message_p;
 
+  OAILOG_INFO(LOG_NAS_EMM, "EMM-PROC  - Sending NAS_ITTI_DETACH_REQ for UE " MME_UE_S1AP_ID_FMT ". \n", ue_id);
+
   message_p = itti_alloc_new_message(TASK_NAS_MME, NAS_DETACH_REQ);
 
-  NAS_DETACH_REQ(message_p).ue_id = ue_idP;
+  NAS_DETACH_REQ(message_p).ue_id = ue_id;
 
   MSC_LOG_TX_MESSAGE(
                 MSC_NAS_MME,
                 MSC_MMEAPP_MME,
                 NULL,0,
-                "0 NAS_DETACH_REQ ue id " MME_UE_S1AP_ID_FMT, ue_idP);
+                "0 NAS_DETACH_REQ ue id " MME_UE_S1AP_ID_FMT, ue_id);
 
   itti_send_msg_to_task(TASK_MME_APP, INSTANCE_DEFAULT, message_p);
   OAILOG_FUNC_OUT(LOG_NAS);
@@ -571,7 +589,7 @@ void  s6a_auth_info_rsp_timer_expiry_handler (void *args)
     // Send Attach Reject with cause NETWORK FAILURE and delete UE context
     nas_proc_auth_param_fail (auth_info_proc->ue_id, NAS_CAUSE_NETWORK_FAILURE);
   } else {
-    OAILOG_ERROR (LOG_NAS_EMM, "EMM-PROC  - Timer timer_s6_auth_info_rsp expired. Null EMM Context for UE \n");
+    OAILOG_ERROR (LOG_NAS_EMM, "EMM-PROC  - Timer timer_s6_auth_info_rsp expired. Null EMM Context for UE " MME_UE_S1AP_ID_FMT ". \n", emm_ctx->ue_id);
   }
 
   OAILOG_FUNC_OUT (LOG_NAS_EMM);

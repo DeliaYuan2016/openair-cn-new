@@ -44,6 +44,9 @@
 #define S1AP_UE_CONTEXT_RELEASE_COMPLETE(mSGpTR) (mSGpTR)->ittiMsg.s1ap_ue_context_release_complete
 #define S1AP_E_RAB_SETUP_REQ(mSGpTR)             (mSGpTR)->ittiMsg.s1ap_e_rab_setup_req
 #define S1AP_E_RAB_SETUP_RSP(mSGpTR)             (mSGpTR)->ittiMsg.s1ap_e_rab_setup_rsp
+#define S1AP_E_RAB_RELEASE_REQ(mSGpTR)           (mSGpTR)->ittiMsg.s1ap_e_rab_release_req
+#define S1AP_E_RAB_RELEASE_RSP(mSGpTR)           (mSGpTR)->ittiMsg.s1ap_e_rab_release_rsp
+
 #define S1AP_INITIAL_UE_MESSAGE(mSGpTR)          (mSGpTR)->ittiMsg.s1ap_initial_ue_message
 
 #define S1AP_ENB_INITIATED_RESET_REQ(mSGpTR) (mSGpTR)->ittiMsg.s1ap_enb_initiated_reset_req
@@ -74,6 +77,8 @@
 /** Handover RequestAcknowledge/Failure. */
 #define S1AP_HANDOVER_REQUEST_ACKNOWLEDGE(mSGpTR)     (mSGpTR)->ittiMsg.s1ap_handover_request_acknowledge
 #define S1AP_HANDOVER_FAILURE(mSGpTR)                 (mSGpTR)->ittiMsg.s1ap_handover_failure
+
+#define S1AP_ERROR_INDICATION(mSGpTR)                 (mSGpTR)->ittiMsg.s1ap_error_indication
 
 /** S1AP Paging. */
 #define S1AP_PAGING(mSGpTR)                           (mSGpTR)->ittiMsg.s1ap_paging
@@ -134,7 +139,7 @@ typedef struct s1ap_initial_ue_message_s {
   ecgi_t                e_utran_cgi;
 } s1ap_initial_ue_message_t;
 
-#define S1AP_UE_RADIOCAPABILITY_MAX_SIZE 1000
+#define S1AP_UE_RADIOCAPABILITY_MAX_SIZE 3000
 
 typedef struct itti_s1ap_ue_cap_ind_s {
   mme_ue_s1ap_id_t  mme_ue_s1ap_id;
@@ -213,6 +218,16 @@ typedef struct itti_s1ap_e_rab_setup_req_s {
 
 } itti_s1ap_e_rab_setup_req_t;
 
+typedef struct itti_s1ap_e_rab_release_req_s {
+  mme_ue_s1ap_id_t    mme_ue_s1ap_id;
+  enb_ue_s1ap_id_t    enb_ue_s1ap_id;
+
+  // E-RAB to Be Setup List
+  e_rab_list_t        e_rab_to_be_release_list;
+  /** NAS message. */
+  bstring                          nas_pdu;
+
+} itti_s1ap_e_rab_release_req_t;
 
 typedef struct itti_s1ap_e_rab_setup_rsp_s {
   mme_ue_s1ap_id_t    mme_ue_s1ap_id;
@@ -226,6 +241,18 @@ typedef struct itti_s1ap_e_rab_setup_rsp_s {
 
 } itti_s1ap_e_rab_setup_rsp_t;
 
+typedef struct itti_s1ap_e_rab_release_rsp_s {
+  mme_ue_s1ap_id_t    mme_ue_s1ap_id;
+  enb_ue_s1ap_id_t    enb_ue_s1ap_id;
+
+  // E-RAB to Be Setup List
+  e_rab_list_t                  e_rab_release_list;
+
+//   Optional
+//  e_rab_list_t        e_rab_failed_to_setup_list;
+
+} itti_s1ap_e_rab_release_rsp_t;
+
 
 // handover messaging
 typedef struct itti_s1ap_path_switch_request_s {
@@ -234,8 +261,11 @@ typedef struct itti_s1ap_path_switch_request_s {
   sctp_assoc_id_t         sctp_assoc_id;
   sctp_stream_id_t        sctp_stream;
   uint32_t                enb_id;
-  ebi_t                   eps_bearer_id;
-  fteid_t                 bearer_s1u_enb_fteid;
+  uint8_t                 no_of_e_rabs;
+  ebi_t                   e_rab_id[BEARERS_PER_UE];
+  bstring                 transport_layer_address[BEARERS_PER_UE];
+  s1u_teid_t              gtp_teid[BEARERS_PER_UE];
+
 //  /* Key eNB */
 //  uint8_t                 kenb[32];
 //
@@ -280,6 +310,8 @@ typedef struct itti_s1ap_handover_required_s {
   /** Target Id. */
   tai_t                   selected_tai;
   ecgi_t                  global_enb_id;
+  uint8_t                 target_enb_type;
+
   /** Cause. */
   S1ap_Cause_PR           f_cause_type;
   long                    f_cause_value;
@@ -299,6 +331,7 @@ typedef struct itti_s1ap_handover_command_s {
   uint32_t                enb_id;
   /** F-Container. */
   bstring                 eutran_target_to_source_container;
+  bearer_contexts_to_be_created_t *bearer_ctx_to_be_forwarded_list;
 
   // todo: handover type will always be set as intra_lte in s1ap layer..
 
@@ -333,8 +366,6 @@ typedef struct itti_s1ap_handover_request_acknowledge_s {
   uint32_t                enb_ue_s1ap_id;
 //  sctp_assoc_id_t         sctp_assoc_id;
 //  sctp_stream_id_t        sctp_stream;
-//  ebi_t                   eps_bearer_id;
-//  fteid_t                 bearer_s1u_enb_fteid;
   uint8_t                 no_of_e_rabs;
   ebi_t                   e_rab_id[BEARERS_PER_UE];
   bstring                 transport_layer_address[BEARERS_PER_UE];
@@ -360,6 +391,15 @@ typedef struct itti_s1ap_handover_preparation_failure_s {
   sctp_assoc_id_t         assoc_id;
   enum s1cause            cause;
 } itti_s1ap_handover_preparation_failure_t;
+
+/** S1AP Error Indication. */
+typedef struct itti_s1ap_error_indication_s {
+  mme_ue_s1ap_id_t        mme_ue_s1ap_id;
+  enb_ue_s1ap_id_t        enb_ue_s1ap_id:24;
+  sctp_assoc_id_t         assoc_id;
+  uint32_t                enb_id;
+  enum s1cause            cause;
+}itti_s1ap_error_indication_t;
 
 /** Path Switch Request Failure. */
 typedef struct itti_s1ap_path_switch_request_failure_s {

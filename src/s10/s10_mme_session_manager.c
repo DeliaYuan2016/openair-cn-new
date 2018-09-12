@@ -122,16 +122,16 @@ s10_mme_forward_relocation_request (
   /**
    * Target Identification.
    */
-  s10_target_identification_ie_set (&(ulp_req.hMsg), &req_p->target_identification);
+  gtpv2c_target_identification_ie_set (&(ulp_req.hMsg), &req_p->target_identification);
 
   /*
-    * Source S10 SAEGW F-TEID for Control Plane
-    */
-   rc = nwGtpv2cMsgAddIeFteid ((ulp_req.hMsg), NW_GTPV2C_IE_INSTANCE_ONE,
-                               S11_SGW_GTP_C,
-                               req_p->s11_sgw_teid.teid,
-                               req_p->s11_sgw_teid.ipv4 ? &req_p->s11_sgw_teid.ipv4_address : 0,
-                                   req_p->s11_sgw_teid.ipv6 ? &req_p->s11_sgw_teid.ipv6_address : NULL);
+   * Source S10 SAEGW F-TEID for Control Plane
+   */
+  rc = nwGtpv2cMsgAddIeFteid ((ulp_req.hMsg), NW_GTPV2C_IE_INSTANCE_ONE,
+      S11_SGW_GTP_C,
+      req_p->s11_sgw_teid.teid,
+      req_p->s11_sgw_teid.ipv4 ? &req_p->s11_sgw_teid.ipv4_address : 0,
+          req_p->s11_sgw_teid.ipv6 ? &req_p->s11_sgw_teid.ipv6_address : NULL);
    DevAssert (NW_OK == rc);
 
    /**
@@ -141,9 +141,9 @@ s10_mme_forward_relocation_request (
        (uint8_t*)req_p->f_container.container_value->data,
        blength(req_p->f_container.container_value),
        req_p->f_container.container_type);
-   /** Destroy the container. */
+//   /** Destroy the container. */
 //   const uint8_t container_map[] = {
-//       0x40, 0x80, 0xc0, 0x0f, 0x10, 0x3f, 0xc5, 0x9a, 0xd4, 0x80, 0x01, 0x06, 0x0e, 0x4d, 0x2a, 0x64,
+//          0x40, 0x80, 0xc0, 0x0f, 0x10, 0x3f, 0xc5, 0x9a, 0xd4, 0x80, 0x01, 0x06, 0x0e, 0x4d, 0x2a, 0x64,
 //          0xea, 0x04, 0x48, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf, 0xc8, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf,
 //          0xc8, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf, 0xc8, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf, 0xc8, 0xff,
 //          0x8b, 0xff, 0xfe, 0x7f, 0xf5, 0xf4, 0x40, 0x40, 0x70, 0xca, 0x74, 0xa9, 0x3b, 0xbe, 0x06, 0x9c,
@@ -160,20 +160,85 @@ s10_mme_forward_relocation_request (
 //          0x00, 0x0d, 0x00, 0x10, 0x80, 0x00, 0x0e, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0c, 0xd0, 0x10, 0x80,
 //          0x00, 0x1c, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0d, 0x00, 0x10, 0x80, 0x00, 0x77, 0x00, 0x00, 0xf9,
 //          0x90, 0x00, 0x0c, 0xd0, 0x10, 0x80, 0x00, 0x4d
+//
+//          ,0x40, 0x80, 0xc0, 0x0f, 0x10, 0x3f, 0xc5, 0x9a, 0xd4, 0x80, 0x01, 0x06, 0x0e, 0x4d, 0x2a, 0x64,
+//          0xea, 0x04, 0x48, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf, 0xc8, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf,
+//          0xc8, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf, 0xc8, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf, 0xc8, 0xff,
+//          0x8b, 0xff, 0xfe, 0x7f, 0xf5, 0xf4, 0x40, 0x40, 0x70, 0xca, 0x74, 0xa9, 0x3b, 0xbe, 0x06, 0x9c,
+//          0x08, 0x00, 0x00, 0x06, 0xc0, 0x15, 0xe0, 0x00, 0x10, 0x06, 0x0e, 0x5a, 0xf0, 0x00, 0x14, 0x80,
+//          0x43, 0xcb, 0x80, 0x00, 0x02, 0x32, 0x11, 0x41, 0xbd, 0x80, 0x9e, 0x18, 0xe0, 0x18, 0x3c, 0x1c,
+//          0x09, 0xe1, 0x8e, 0x01, 0x83, 0xc0, 0x1f, 0x51, 0x34, 0x81, 0x68, 0x3a, 0x0c, 0x0e, 0x1a, 0x67,
+//          0xcc, 0x01, 0xe9, 0x2c, 0x7f, 0xe8, 0x00, 0x8c, 0x30, 0x64, 0x81, 0x4c, 0x02, 0x05, 0x44, 0x0d,
+//          0x9c, 0x00, 0x05, 0x45, 0x0a, 0x50, 0xd0, 0x00, 0x29, 0x00, 0x40, 0x70, 0x2a, 0x58, 0x00, 0x28,
+//          0x40, 0x24, 0x13, 0x02, 0x59, 0x00, 0x0c, 0xd0, 0x19, 0x00, 0x6a, 0x30, 0x40, 0x08, 0x80, 0x17,
+//          0xa5, 0x14, 0x09, 0x09, 0x2a, 0xb7, 0x8d, 0x10, 0x00, 0x1a, 0x05, 0xa1, 0x40, 0x80, 0x00, 0x01,
+//          0x00, 0x1c, 0x2b, 0xec, 0x8a, 0xa2, 0x46, 0x00, 0xd4, 0x9b, 0x28, 0x3a, 0x18, 0x38, 0x40, 0x80,
+//          0x08, 0x14, 0x00, 0x00, 0x00, 0x4e, 0x40, 0x01, 0x05, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0d, 0x00,
+//          0x14, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0c, 0xd0, 0x10, 0x80, 0x00, 0x18, 0x00, 0x00, 0xf9, 0x90,
+//          0x00, 0x0d, 0x00, 0x10, 0x80, 0x00, 0x0e, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0c, 0xd0, 0x10, 0x80,
+//          0x00, 0x1c, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0d, 0x00, 0x10, 0x80, 0x00, 0x77, 0x00, 0x00, 0xf9,
+//          0x90, 0x00, 0x0c, 0xd0, 0x10, 0x80, 0x00, 0x4d
+//
+//                   ,0x40, 0x80, 0xc0, 0x0f, 0x10, 0x3f, 0xc5, 0x9a, 0xd4, 0x80, 0x01, 0x06, 0x0e, 0x4d, 0x2a, 0x64,
+//                    0xea, 0x04, 0x48, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf, 0xc8, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf,
+//                    0xc8, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf, 0xc8, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf, 0xc8, 0xff,
+//                    0x8b, 0xff, 0xfe, 0x7f, 0xf5, 0xf4, 0x40, 0x40, 0x70, 0xca, 0x74, 0xa9, 0x3b, 0xbe, 0x06, 0x9c,
+//                    0x08, 0x00, 0x00, 0x06, 0xc0, 0x15, 0xe0, 0x00, 0x10, 0x06, 0x0e, 0x5a, 0xf0, 0x00, 0x14, 0x80,
+//                    0x43, 0xcb, 0x80, 0x00, 0x02, 0x32, 0x11, 0x41, 0xbd, 0x80, 0x9e, 0x18, 0xe0, 0x18, 0x3c, 0x1c,
+//                    0x09, 0xe1, 0x8e, 0x01, 0x83, 0xc0, 0x1f, 0x51, 0x34, 0x81, 0x68, 0x3a, 0x0c, 0x0e, 0x1a, 0x67,
+//                    0xcc, 0x01, 0xe9, 0x2c, 0x7f, 0xe8, 0x00, 0x8c, 0x30, 0x64, 0x81, 0x4c, 0x02, 0x05, 0x44, 0x0d,
+//                    0x9c, 0x00, 0x05, 0x45, 0x0a, 0x50, 0xd0, 0x00, 0x29, 0x00, 0x40, 0x70, 0x2a, 0x58, 0x00, 0x28,
+//                    0x40, 0x24, 0x13, 0x02, 0x59, 0x00, 0x0c, 0xd0, 0x19, 0x00, 0x6a, 0x30, 0x40, 0x08, 0x80, 0x17,
+//
+//
+//                    0xa5, 0x14, 0x09, 0x09, 0x2a, 0xb7, 0x8d, 0x10, 0x00, 0x1a, 0x05, 0xa1, 0x40, 0x80, 0x00, 0x01,
+//                    0x00, 0x1c, 0x2b, 0xec, 0x8a, 0xa2, 0x46, 0x00, 0xd4, 0x9b, 0x28, 0x3a, 0x18, 0x38, 0x40, 0x80,
+//                    0x08, 0x14, 0x00, 0x00, 0x00, 0x4e, 0x40, 0x01, 0x05, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0d, 0x00,
+//                    0x14, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0c, 0xd0, 0x10, 0x80, 0x00, 0x18, 0x00, 0x00, 0xf9, 0x90,
+//                    0x00, 0x0d, 0x00, 0x10, 0x80, 0x00, 0x0e, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0c, 0xd0, 0x10, 0x80,
+//
+//                    0x00, 0x1c, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0d, 0x00, 0x10, 0x80, 0x00 , 0x77, 0x00, 0x00, 0xf9,
+//                    0x90, 0x00, 0x0c, 0xd0, 0x10, 0x80, 0x00, 0x4d
+//
+////                    0x00, 0x1c, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0d, 0x00, 0x10, // 0x80, //    0x00 , 0x77, 0x00, 0x00, 0xf9,
+//////                    0x90, 0x00, 0x0c, 0xd0, 0x10, 0x80, 0x00, 0x4d
+////
+//                    ,0x40, 0x80, 0xc0, 0x0f, 0x10, 0x3f, 0xc5, 0x9a, 0xd4, 0x80, 0x01, 0x06, 0x0e, 0x4d, 0x2a, 0x64,
+//                                     0xea, 0x04, 0x48, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf, 0xc8, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf,
+//                                     0xc8, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf, 0xc8, 0xff, 0x8b, 0xfc, 0x8f, 0xf8, 0xbf, 0xc8, 0xff,
+//                                     0x8b, 0xff, 0xfe, 0x7f, 0xf5, 0xf4, 0x40, 0x40, 0x70, 0xca, 0x74, 0xa9, 0x3b, 0xbe, 0x06, 0x9c,
+//                                     0x08, 0x00, 0x00, 0x06, 0xc0, 0x15, 0xe0, 0x00, 0x10, 0x06, 0x0e, 0x5a, 0xf0, 0x00, 0x14, 0x80,
+//                                     0x43, 0xcb, 0x80, 0x00, 0x02, 0x32, 0x11, 0x41, 0xbd, 0x80, 0x9e, 0x18, 0xe0, 0x18, 0x3c, 0x1c,
+//                                     0x09, 0xe1, 0x8e, 0x01, 0x83, 0xc0, 0x1f, 0x51, 0x34, 0x81, 0x68, 0x3a, 0x0c, 0x0e, 0x1a, 0x67,
+//                                     0xcc, 0x01, 0xe9, 0x2c, 0x7f, 0xe8, 0x00, 0x8c, 0x30, 0x64, 0x81, 0x4c, 0x02, 0x05, 0x44, 0x0d,
+//                                     0x9c, 0x00, 0x05, 0x45, 0x0a, 0x50, 0xd0, 0x00, 0x29, 0x00, 0x40, 0x70, 0x2a, 0x58, 0x00, 0x28,
+//                                     0x40, 0x24, 0x13, 0x02, 0x59, 0x00, 0x0c, 0xd0, 0x19, 0x00, 0x6a, 0x30, 0x40, 0x08, 0x80, 0x17,
+//                                     0xa5, 0x14, 0x09, 0x09, 0x2a, 0xb7, 0x8d, 0x10, 0x00, 0x1a, 0x05, 0xa1, 0x40, 0x80, 0x00, 0x01,
+//                                     0x00, 0x1c, 0x2b, 0xec, 0x8a, 0xa2, 0x46, 0x00, 0xd4, 0x9b, 0x28, 0x3a, 0x18, 0x38, 0x40, 0x80,
+//                                     0x08, 0x14, 0x00, 0x00, 0x00, 0x4e, 0x40, 0x01, 0x05, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0d, 0x00,
+//                                     0x14, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0c, 0xd0, 0x10, 0x80, 0x00, 0x18, 0x00, 0x00, 0xf9, 0x90,
+//                                     0x00, 0x0d, 0x00, 0x10, 0x80, 0x00, 0x0e, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0c, 0xd0, 0x10, 0x80,
+//                                     0x00, 0x1c, 0x00, 0x00, 0xf9, 0x90, 0x00, 0x0d, 0x00, 0x10, 0x80, 0x00, 0x77, 0x00, 0x00, 0xf9,
+//                                     0x90, 0x00, 0x0c, 0xd0, 0x10, 0x80, 0x00, 0x4d
+//
 //   };
-//   bstring new_long_container = blk2bstr(container_map, 264);
+//   bstring new_long_container = blk2bstr(container_map, ((264 * 4) ));
 //   rc = nwGtpv2cMsgAddIeFContainer((ulp_req.hMsg), NW_GTPV2C_IE_INSTANCE_ZERO,
 //       (uint8_t*)new_long_container->data,
 //       blength(new_long_container),
-//       req_p->eutran_container.container_type);
+//       req_p->f_container.container_type);
 //   bdestroy_wrapper(&new_long_container);
 
 
    DevAssert( NW_OK == rc );
 
+   DevAssert (0 <= req_p->pdn_connections->num_pdn_connections);
+   DevAssert(MSG_FORWARD_RELOCATION_REQUEST_MAX_PDN_CONNECTIONS >= req_p->pdn_connections->num_pdn_connections);
 
-//  s10_serving_network_ie_set (&(ulp_req.hMsg), &req_p->serving_network);
-   s10_pdn_connection_ie_set (&(ulp_req.hMsg), req_p->pdn_connections);
+   for(int num_pdn= 0; num_pdn < req_p->pdn_connections->num_pdn_connections; num_pdn++){
+     pdn_connection_t * pdn_connection = &req_p->pdn_connections->pdn_connection[num_pdn];
+     s10_pdn_connection_ie_set (&(ulp_req.hMsg), pdn_connection);
+   }
 
   /**
    * Set the MM EPS UE Context.
@@ -221,7 +286,7 @@ s10_mme_handle_forward_relocation_request(
 
   /** Check the destination TEID is 0. */
   if(req_p->teid != (teid_t)0){
-    OAILOG_WARNING (LOG_S10, "Destination TEID of S10 Forward Relocation Request is not 0, insted " TEID_FMT ". Ignoring S10 Forward Relocation Request. \n", req_p->teid);
+    OAILOG_WARNING (LOG_S10, "Destination TEID of S10 Forward Relocation Request is not 0, instead " TEID_FMT ". Ignoring S10 Forward Relocation Request. \n", req_p->teid);
     return RETURNerror;
   }
 
@@ -257,8 +322,8 @@ s10_mme_handle_forward_relocation_request(
    * todo: multiple pdn connection IEs can exist with instance 0.
    */
   req_p->pdn_connections = calloc(1, sizeof(mme_ue_eps_pdn_connections_t));
-  rc = nwGtpv2cMsgParserAddIe (pMsgParser, NW_GTPV2C_IE_PDN_CONNECTION, NW_GTPV2C_IE_INSTANCE_ZERO, NW_GTPV2C_IE_PRESENCE_MANDATORY,
-       s10_pdn_connection_ie_get, req_p->pdn_connections);
+  rc = nwGtpv2cMsgParserAddIe (pMsgParser, NW_GTPV2C_IE_PDN_CONNECTION, NW_GTPV2C_IE_INSTANCE_ZERO, NW_GTPV2C_IE_PRESENCE_CONDITIONAL,
+       s10_pdn_connections_ie_get, req_p->pdn_connections);
   DevAssert (NW_OK == rc);
 
   /*
@@ -281,7 +346,7 @@ s10_mme_handle_forward_relocation_request(
    * Target Identifier Information Element.
    */
   rc = nwGtpv2cMsgParserAddIe (pMsgParser, NW_GTPV2C_IE_TARGET_IDENTIFICATION, NW_GTPV2C_IE_INSTANCE_ZERO, NW_GTPV2C_IE_PRESENCE_CONDITIONAL,
-       s10_target_identification_ie_get, &req_p->target_identification);
+      gtpv2c_target_identification_ie_get, &req_p->target_identification);
   DevAssert (NW_OK == rc);
 
   // todo: F-CAUSE not handled!
@@ -311,6 +376,7 @@ s10_mme_handle_forward_relocation_request(
 
   MSC_LOG_RX_MESSAGE (MSC_S10_MME, MSC_MMEAPP_MME, NULL, 0, "0 FORWARD_RELOCATION_REQUEST local S10 teid " TEID_FMT " num pdn connections %u", req_p->teid,
       req_p->pdn_connections.num_pdn_connections);
+
   return itti_send_msg_to_task (TASK_MME_APP, INSTANCE_DEFAULT, message_p);
 }
 
@@ -1112,76 +1178,80 @@ s10_mme_context_response (
     nw_gtpv2c_stack_handle_t *stack_p,
     itti_s10_context_response_t *rsp_p)
 {
-  nw_gtpv2c_ulp_api_t                         ulp_req;
-  nw_rc_t                                   rc;
-  uint8_t                                 restart_counter = 0;
+  nw_gtpv2c_ulp_api_t                         ulp_rsp;
+  nw_rc_t                                     rc;
+  uint8_t                                     restart_counter = 0;
   nw_gtpv2c_trxn_handle_t                     trxn;
-  gtpv2c_cause_t                             cause;
+  gtpv2c_cause_t                              cause;
 
   DevAssert (rsp_p );
   DevAssert (stack_p );
-  memset (&ulp_req, 0, sizeof (nw_gtpv2c_ulp_api_t));
+  memset (&ulp_rsp, 0, sizeof (nw_gtpv2c_ulp_api_t));
   memset (&cause, 0, sizeof (gtpv2c_cause_t));
 
   trxn = (nw_gtpv2c_trxn_handle_t) rsp_p->trxn;
   DevAssert (trxn);
 
-
   /**
    * Prepare a context response to send to target MME.
    */
-  ulp_req.apiType = NW_GTPV2C_ULP_API_TRIGGERED_RSP;
-  ulp_req.u_api_info.triggeredRspInfo.hTrxn = trxn;
-  ulp_req.u_api_info.triggeredRspInfo.teidLocal = rsp_p->s10_source_mme_teid.teid;
-  ulp_req.u_api_info.triggeredRspInfo.hUlpTunnel = 0;
-  ulp_req.u_api_info.triggeredRspInfo.hTunnel    = 0;
+  ulp_rsp.apiType = NW_GTPV2C_ULP_API_TRIGGERED_RSP;
+  ulp_rsp.u_api_info.triggeredRspInfo.hTrxn = trxn;
+  ulp_rsp.u_api_info.triggeredRspInfo.teidLocal = rsp_p->s10_source_mme_teid.teid;
+  ulp_rsp.u_api_info.triggeredRspInfo.hUlpTunnel = 0;
+  ulp_rsp.u_api_info.triggeredRspInfo.hTunnel    = 0;
 
   /**
    * Create a tunnel for the GTPv2-C stack if its a positive response.
    */
   if(rsp_p->cause.cause_value == REQUEST_ACCEPTED){
-    ulp_req.apiType |= NW_GTPV2C_ULP_API_FLAG_CREATE_LOCAL_TUNNEL;
+    ulp_rsp.apiType |= NW_GTPV2C_ULP_API_FLAG_CREATE_LOCAL_TUNNEL;
   }else{
     OAILOG_WARNING (LOG_S10, "The cause is not REQUEST_ACCEPTED but %d for S10_CONTEXT_RESPONSE. "
         "Not creating a local S10 Tunnel @ triggered response! \n", rsp_p->cause);
   }
 
-  rc = nwGtpv2cMsgNew (*stack_p, true, NW_GTP_CONTEXT_RSP, 0, 0, &(ulp_req.hMsg));
+  rc = nwGtpv2cMsgNew (*stack_p, true, NW_GTP_CONTEXT_RSP, 0, 0, &(ulp_rsp.hMsg));
   DevAssert (NW_OK == rc);
   /*
    * Set the destination TEID
    */
-  rc = nwGtpv2cMsgSetTeid (ulp_req.hMsg, rsp_p->teid);
+  rc = nwGtpv2cMsgSetTeid (ulp_rsp.hMsg, rsp_p->teid);
   DevAssert (NW_OK == rc);
 
   /** Add the S10 Cause : Not setting offending IE type now. */
-  rc = nwGtpv2cMsgAddIeCause((ulp_req.hMsg), 0, rsp_p->cause.cause_value, 0, 0, 0);
+  rc = nwGtpv2cMsgAddIeCause((ulp_rsp.hMsg), 0, rsp_p->cause.cause_value, 0, 0, 0);
   DevAssert( NW_OK == rc );
 
   if(rsp_p->cause.cause_value == REQUEST_ACCEPTED){
     /** Add the S10 source-MME FTEID. */
-    rc = nwGtpv2cMsgAddIeFteid ((ulp_req.hMsg), NW_GTPV2C_IE_INSTANCE_ZERO, S10_MME_GTP_C,
+    rc = nwGtpv2cMsgAddIeFteid ((ulp_rsp.hMsg), NW_GTPV2C_IE_INSTANCE_ZERO, S10_MME_GTP_C,
         rsp_p->s10_source_mme_teid.teid, /**< FTEID of the TARGET_MME. */
         rsp_p->s10_source_mme_teid.ipv4 ? &rsp_p->s10_source_mme_teid.ipv4_address : 0,
             rsp_p->s10_source_mme_teid.ipv6 ? &rsp_p->s10_source_mme_teid.ipv6_address : NULL);
 
     /** Add the S10 source-MME SAE-GW FTEID. */
-    rc = nwGtpv2cMsgAddIeFteid ((ulp_req.hMsg), NW_GTPV2C_IE_INSTANCE_ONE, S11_SGW_GTP_C,
+    rc = nwGtpv2cMsgAddIeFteid ((ulp_rsp.hMsg), NW_GTPV2C_IE_INSTANCE_ONE, S11_SGW_GTP_C,
         rsp_p->s11_sgw_teid.teid, /**< FTEID of the TARGET_MME. */
         rsp_p->s11_sgw_teid.ipv4 ? &rsp_p->s11_sgw_teid.ipv4_address : 0,
             rsp_p->s11_sgw_teid.ipv6 ? &rsp_p->s11_sgw_teid.ipv6_address : NULL);
     DevAssert (NW_OK == rc);
 
     /** IMSI. */
-    gtpv2c_imsi_ie_set (&(ulp_req.hMsg), &rsp_p->imsi);
+    gtpv2c_imsi_ie_set (&(ulp_rsp.hMsg), &rsp_p->imsi);
 
     /** PDN Connection IE. */
-    s10_pdn_connection_ie_set (&(ulp_req.hMsg), rsp_p->pdn_connections);
+    DevAssert (0 <= rsp_p->pdn_connections->num_pdn_connections);
+    DevAssert(MSG_FORWARD_RELOCATION_REQUEST_MAX_PDN_CONNECTIONS >= rsp_p->pdn_connections->num_pdn_connections);
+    for(int num_pdn= 0; num_pdn < rsp_p->pdn_connections->num_pdn_connections; num_pdn++){
+      pdn_connection_t * pdn_connection = &rsp_p->pdn_connections->pdn_connection[num_pdn];
+      s10_pdn_connection_ie_set (&(ulp_rsp.hMsg), pdn_connection);
+    }
 
     /** Set the MM EPS UE Context. */
-    s10_ue_mm_eps_context_ie_set(&(ulp_req.hMsg), rsp_p->ue_eps_mm_context);
+    s10_ue_mm_eps_context_ie_set(&(ulp_rsp.hMsg), rsp_p->ue_eps_mm_context);
   }
-  rc = nwGtpv2cProcessUlpReq (*stack_p, &ulp_req);
+  rc = nwGtpv2cProcessUlpReq (*stack_p, &ulp_rsp);
   DevAssert (NW_OK == rc);
 
   /**
@@ -1189,10 +1259,10 @@ s10_mme_context_response (
    */
   if(rsp_p->cause.cause_value == REQUEST_ACCEPTED){
     hashtable_rc_t hash_rc = hashtable_ts_insert(s10_mme_teid_2_gtv2c_teid_handle, /**< Directly register the created tunnel. */
-        (hash_key_t) ulp_req.u_api_info.createLocalTunnelInfo.teidLocal,
-        (void *)ulp_req.u_api_info.createLocalTunnelInfo.hTunnel); /**< Just store the value as int (no free method) after allocating the S10 GTPv2c Tunnel from the tunnel pool. */
+        (hash_key_t) ulp_rsp.u_api_info.createLocalTunnelInfo.teidLocal,
+        (void *)ulp_rsp.u_api_info.createLocalTunnelInfo.hTunnel); /**< Just store the value as int (no free method) after allocating the S10 GTPv2c Tunnel from the tunnel pool. */
     hash_rc = hashtable_ts_get(s10_mme_teid_2_gtv2c_teid_handle,
-        (hash_key_t) ulp_req.u_api_info.createLocalTunnelInfo.teidLocal, (void **)(uintptr_t)&ulp_req.u_api_info.createLocalTunnelInfo.hTunnel);
+        (hash_key_t) ulp_rsp.u_api_info.createLocalTunnelInfo.teidLocal, (void **)(uintptr_t)&ulp_rsp.u_api_info.createLocalTunnelInfo.hTunnel);
     DevAssert(hash_rc == HASH_TABLE_OK);
   }else{
     OAILOG_WARNING (LOG_S10, "The cause is not REQUEST_ACCEPTED but %d for S10_CONTEXT_RESPONSE. "
@@ -1264,7 +1334,7 @@ s10_mme_handle_context_response(
    */
   resp_p->pdn_connections = calloc(1, sizeof(mme_ue_eps_pdn_connections_t));
   rc = nwGtpv2cMsgParserAddIe (pMsgParser, NW_GTPV2C_IE_PDN_CONNECTION, NW_GTPV2C_IE_INSTANCE_ZERO, NW_GTPV2C_IE_PRESENCE_CONDITIONAL,
-      s10_pdn_connection_ie_get, resp_p->pdn_connections);
+      s10_pdn_connections_ie_get, resp_p->pdn_connections);
   DevAssert (NW_OK == rc);
 
    /*
@@ -1689,28 +1759,33 @@ s10_mme_relocation_cancel_response(
   rc = nwGtpv2cProcessUlpReq (*stack_p, &ulp_rsp);
   DevAssert (NW_OK == rc);
 
+  /*
+   * If a handover procedure exists, the tunnel enpoint will be removed with that procedure.
+   * Not with this message.
+   */
+
   /** Depending if there is a GTPv2c Tunnel or not, remove the tunnel. */
-  memset (&ulp_rsp, 0, sizeof (nw_gtpv2c_ulp_api_t));
-  ulp_rsp.apiType = NW_GTPV2C_ULP_DELETE_LOCAL_TUNNEL;
-
-  hashtable_rc_t hash_rc = hashtable_ts_get(s10_mme_teid_2_gtv2c_teid_handle,
-      (hash_key_t) relocation_cancel_resp_p->local_teid, (void **)(uintptr_t)&ulp_rsp.u_api_info.deleteLocalTunnelInfo.hTunnel);
-  if (HASH_TABLE_OK != hash_rc) {
-    OAILOG_WARNING (LOG_S10, "Could not get GTPv2-C hTunnel for local TEID %X on S10 MME interface. \n", relocation_cancel_resp_p->local_teid);
-    return RETURNok;
-  }
-
-  rc = nwGtpv2cProcessUlpReq (*stack_p, &ulp_rsp);
-  DevAssert (NW_OK == rc);
-  OAILOG_INFO(LOG_S10, "DELETED local S10 teid (TEID FOUND IN HASH_MAP)" TEID_FMT " \n", relocation_cancel_resp_p->local_teid);
+//  memset (&ulp_rsp, 0, sizeof (nw_gtpv2c_ulp_api_t));
+//  ulp_rsp.apiType = NW_GTPV2C_ULP_DELETE_LOCAL_TUNNEL;
+//
+//  hashtable_rc_t hash_rc = hashtable_ts_get(s10_mme_teid_2_gtv2c_teid_handle,
+//      (hash_key_t) relocation_cancel_resp_p->local_teid, (void **)(uintptr_t)&ulp_rsp.u_api_info.deleteLocalTunnelInfo.hTunnel);
+//  if (HASH_TABLE_OK != hash_rc) {
+//    OAILOG_WARNING (LOG_S10, "Could not get GTPv2-C hTunnel for local TEID %X on S10 MME interface. \n", relocation_cancel_resp_p->local_teid);
+//    return RETURNok;
+//  }
+//
+//  rc = nwGtpv2cProcessUlpReq (*stack_p, &ulp_rsp);
+//  DevAssert (NW_OK == rc);
+//  OAILOG_INFO(LOG_S10, "DELETED local S10 teid (TEID FOUND IN HASH_MAP)" TEID_FMT " \n", relocation_cancel_resp_p->local_teid);
 
   /**
    * hash_free_int_func is set as the freeing function.
    * The value is removed from the map. But the value itself (int) is not freed.
    * The Tunnels are not deallocated but just set back to the Tunnel pool.
    */
-  hash_rc = hashtable_ts_free(s10_mme_teid_2_gtv2c_teid_handle, (hash_key_t) relocation_cancel_resp_p->local_teid);
-  DevAssert (HASH_TABLE_OK == hash_rc);
+//  hash_rc = hashtable_ts_free(s10_mme_teid_2_gtv2c_teid_handle, (hash_key_t) relocation_cancel_resp_p->local_teid);
+//  DevAssert (HASH_TABLE_OK == hash_rc);
   return RETURNok;
 }
 

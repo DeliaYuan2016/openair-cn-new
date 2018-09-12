@@ -49,6 +49,8 @@ function help()
   echo_error "Options:"
   echo_error "Mandatory arguments to long options are mandatory for short options too."
   echo_error "  -c, --config-file     file_abs_path Config file to be used by MME if you don't want to use the default one: $g_mme_default_config_file"
+  echo_error "  -e, --enable-core-dump              Enable core dump for mme executable"
+  echo_error "  -d, --disable-core-dump             Disable core dump for mme executable"
   echo_error "  -g, --gdb                           Run with GDB."
   echo_error "  -G, --gdb-cmd         cmd cmd_arg   Append this GDB cmd to GDB command file (ex1: break Attach.c:272, ex2: watch 0xffee0002)."
   echo_error "                                      All repetitions of this argument are valid."
@@ -78,7 +80,6 @@ function control_c()
   exit $?
 }
 
-PIDFILE=/var/run/$NAME.pid
 function main()
 {
   local -i run_gdb=0
@@ -96,6 +97,27 @@ function main()
         mme_config_file=$2
         echo "setting config file to: $mme_config_file"
         shift 2;
+        ;;
+      -e | --enable-core-dump)
+        # https://developer.toradex.com/knowledge-base/enable-and-analyze-coredumps-in-linux
+        # Warning for Ubuntu apport should be disabled, should be same for other distro similar services
+        core_dump_enabled=$(cat /boot/config-`uname -r` | grep CONFIG_COREDUMP | cut -d '=' -f2)
+        if [[ $core_dump_enabled != 'y' ]]; then
+          echo_error "Core dumps not enabled for this kernel"
+        else
+          $SUDO sysctl -w kernel.core_uses_pid=1
+          $SUDO sysctl -w kernel.core_pattern='/var/crash/core-%e-%s-%u-%g-%p-%t'
+          $SUDO sysctl -w fs.suid_dumpable=2
+        
+          ulimit -S -c 0
+          ulimit -S -c unlimited /usr/local/bin/mme
+          echo "Enabled core dump for mme executable"
+        fi
+        shift;
+        ;;
+      -d | --disable-core-dump)
+        ulimit -S -c 0 /usr/local/bin/mme
+        shift;
         ;;
       -g | --gdb)
         run_gdb=1
@@ -166,10 +188,16 @@ function main()
       return 1
     fi
   fi
-  
+
+  if [ ! -d /var/run/mme ]; then
+    $SUDO mkdir -p /var/run/mme > /dev/null
+  fi
+
+  if [ ! -d /usr/local/etc/oai/freeDiameter ]; then
+    $SUDO mkdir -m 777 -p /usr/local/etc/oai/freeDiameter > /dev/null
+  fi
+
   if [ $var_check_install_mme_files -gt 0 ];then
-    $SUDO mkdir -p /usr/local/etc/oai/freeDiameter > /dev/null
-  
     if [ ! -f /usr/local/etc/oai/mme.conf ]; then
       $SUDO cp -upv $THIS_SCRIPT_PATH/../etc/mme.conf    /usr/local/etc/oai
       echo_error "Please customize /usr/local/etc/oai/mme.conf (interfaces, TAIs, GUMMEI, HSS hostname, SGW IP address, logging, etc), after, please re-run run_mme -I"
@@ -184,7 +212,7 @@ function main()
         fi
       fi
     fi 
-  
+
     $SUDO cp -upv $THIS_SCRIPT_PATH/../etc/mme_fd.conf /usr/local/etc/oai/freeDiameter
     echo_warning "Be carefull /usr/local/etc/oai/freeDiameter/mme_fd.conf has realm, freeDiameter identity, HSS "
     echo_warning "IPv4 address, HSS realm, HSS FQDN, all hardcoded, please check them and change them upon your needs."

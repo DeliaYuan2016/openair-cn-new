@@ -48,8 +48,12 @@ extern "C" {
 #define PGW_CONFIG_STRING_NAS_FORCE_PUSH_PCO                    "FORCE_PUSH_PROTOCOL_CONFIGURATION_OPTIONS"
 
 #define PGW_CONFIG_STRING_IP_ADDRESS_POOL                       "IP_ADDRESS_POOL"
+#define PGW_CONFIG_STRING_ARP_UE                                "ARP_UE"
+#define PGW_CONFIG_STRING_ARP_UE_CHOICE_NO                      "NO"
+#define PGW_CONFIG_STRING_ARP_UE_CHOICE_LINUX                   "LINUX"
+#define PGW_CONFIG_STRING_ARP_UE_CHOICE_OAI                     "OAI"
 #define PGW_CONFIG_STRING_IPV4_ADDRESS_LIST                     "IPV4_LIST"
-#define PGW_CONFIG_STRING_IPV4_PREFIX_DELIMITER                 '/'
+#define PGW_CONFIG_STRING_IPV4_ADDRESS_RANGE_DELIMITER          '-'
 #define PGW_CONFIG_STRING_DEFAULT_DNS_IPV4_ADDRESS              "DEFAULT_DNS_IPV4_ADDRESS"
 #define PGW_CONFIG_STRING_DEFAULT_DNS_SEC_IPV4_ADDRESS          "DEFAULT_DNS_SEC_IPV4_ADDRESS"
 #define PGW_CONFIG_STRING_UE_MTU                                "UE_MTU"
@@ -71,6 +75,15 @@ extern "C" {
 #define PGW_ABORT_ON_ERROR true
 #define PGW_WARN_ON_ERROR  false
 
+#define PGW_CONFIG_STRING_OVS_CONFIG                            "OVS"
+#define PGW_CONFIG_STRING_OVS_BRIDGE_NAME                       "BRIDGE_NAME"
+#define PGW_CONFIG_STRING_OVS_EGRESS_PORT_NUM                   "EGRESS_PORT_NUM"
+#define PGW_CONFIG_STRING_OVS_GTP_PORT_NUM                      "GTP_PORT_NUM"
+#define PGW_CONFIG_STRING_OVS_L2_EGRESS_PORT                    "L2_EGRESS_PORT"
+#define PGW_CONFIG_STRING_OVS_UPLINK_MAC                        "UPLINK_MAC"
+#define PGW_CONFIG_STRING_OVS_SGI_ARP_CACHE                     "SGI_ARP_CACHE"
+#define PGW_CONFIG_STRING_IP                                    "IP"
+#define PGW_CONFIG_STRING_MAC                                   "MAC"
 
 // may be more
 #define PGW_MAX_ALLOCATED_PDN_ADDRESSES 1024
@@ -81,7 +94,21 @@ typedef struct conf_ipv4_list_elm_s {
   struct in_addr  addr;
 } conf_ipv4_list_elm_t;
 
+typedef struct sgi_arp_boot_cache_s {
+#define PGW_ARP_BOOT_CACHE_NUM_ENTRIES_MAX 16
+  struct in_addr   ip[PGW_ARP_BOOT_CACHE_NUM_ENTRIES_MAX];
+  bstring          mac[PGW_ARP_BOOT_CACHE_NUM_ENTRIES_MAX];
+  int num_entries;
+} sgi_arp_boot_cache_t;
 
+typedef struct spgw_ovs_config_s {
+  bstring  bridge_name;
+  int      egress_port_num;
+  bstring  l2_egress_port;
+  int      gtp_port_num;
+  bstring  uplink_mac; // next (first) hop
+  sgi_arp_boot_cache_t sgi_arp_boot_cache;
+} spgw_ovs_config_t;
 
 #include "pgw_pcef_emulation.h"
 
@@ -114,8 +141,17 @@ typedef struct pgw_config_s {
 
   int              num_ue_pool;
 #define PGW_NUM_UE_POOL_MAX 96
-  uint8_t          ue_pool_mask[PGW_NUM_UE_POOL_MAX];
-  struct in_addr   ue_pool_addr[PGW_NUM_UE_POOL_MAX];
+  struct in_addr   ue_pool_range_low[PGW_NUM_UE_POOL_MAX];
+  struct in_addr   ue_pool_range_high[PGW_NUM_UE_POOL_MAX];
+
+  struct in_addr   ue_pool_network[PGW_NUM_UE_POOL_MAX]; // computed from config
+  struct in_addr   ue_pool_netmask[PGW_NUM_UE_POOL_MAX]; // computed from config
+  //computed from config, UE IP adresses that matches ue_pool_network[]/ue_pool_netmask[] but do not match ue_pool_range_low[] - ue_pool_range_high[]
+  // The problem here is that OpenFlow do not deal with ip ranges but with netmasks
+  STAILQ_HEAD(ipv4_list_excl_from_pool_head_s,     ipv4_list_elm_s)  ue_pool_excluded[PGW_NUM_UE_POOL_MAX];
+
+  bool             arp_ue_linux;
+  bool             arp_ue_oai;
 
   bool      force_push_pco;
   uint16_t  ue_mtu;
@@ -131,6 +167,10 @@ typedef struct pgw_config_s {
     uint64_t  apn_ambr_ul;
     uint64_t  apn_ambr_dl;
   } pcef;
+
+#if ENABLE_OPENFLOW
+  spgw_ovs_config_t ovs_config;
+#endif
 
   STAILQ_HEAD(ipv4_pool_head_s, conf_ipv4_list_elm_s) ipv4_pool_list;
 } pgw_config_t;
