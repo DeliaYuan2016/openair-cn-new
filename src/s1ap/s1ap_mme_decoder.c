@@ -298,13 +298,14 @@ int
 s1ap_mme_decode_pdu (
   s1ap_message *message,
   const_bstring const raw,
+  int offset,
   MessagesIds *message_id) {
   S1AP_PDU_t                              pdu = {(S1AP_PDU_PR_NOTHING)};
   S1AP_PDU_t                             *pdu_p = &pdu;
   asn_dec_rval_t                          dec_ret = {(RC_OK)};
   DevAssert (raw != NULL);
   memset ((void *)pdu_p, 0, sizeof (S1AP_PDU_t));
-  dec_ret = aper_decode (NULL, &asn_DEF_S1AP_PDU, (void **)&pdu_p, bdata(raw), blength(raw), 0, 0);
+  dec_ret = aper_decode (NULL, &asn_DEF_S1AP_PDU, (void **)&pdu_p, bdataofs(raw, offset), blength(raw) - offset, 0, 0);
 
   if (dec_ret.code != RC_OK) {
     OAILOG_ERROR (LOG_S1AP, "Failed to decode PDU\n");

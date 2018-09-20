@@ -191,20 +191,27 @@ s1ap_mme_thread (
          * Decode and handle it.
          */
         s1ap_message                            message = {0};
+        int msglen, offset = 0;
 
-        /*
-         * Invoke S1AP message decoder
-         */
-        if (s1ap_mme_decode_pdu (&message, SCTP_DATA_IND (received_message_p).payload, &message_id) < 0) {
-          // TODO: Notify eNB of failure with right cause
-          OAILOG_ERROR (LOG_S1AP, "Failed to decode new buffer\n");
-        } else {
-          s1ap_mme_handle_message (SCTP_DATA_IND (received_message_p).assoc_id, SCTP_DATA_IND (received_message_p).stream, &message);
-        }
+        do {
+          memset(&message, 0, sizeof(message));
 
-        if (message_id != MESSAGES_ID_MAX) {
-          s1ap_free_mme_decode_pdu(&message, message_id);
-        }
+          /*
+           * Invoke S1AP message decoder
+           */
+          if (s1ap_mme_decode_pdu (&message, SCTP_DATA_IND (received_message_p).payload, offset, &message_id) < 0) {
+            // TODO: Notify eNB of failure with right cause
+            OAILOG_ERROR (LOG_S1AP, "Failed to decode new buffer\n");
+          } else {
+            s1ap_mme_handle_message (SCTP_DATA_IND (received_message_p).assoc_id, SCTP_DATA_IND (received_message_p).stream, &message);
+          }
+
+          if (message_id != MESSAGES_ID_MAX) {
+            s1ap_free_mme_decode_pdu(&message, message_id);
+          }
+          offset += msglen + SCTP_DATA_CHUNK_HEADER_SIZE;
+
+        } while (offset < blength(SCTP_DATA_IND (received_message_p).payload));
 
         /*
          * Free received PDU array
